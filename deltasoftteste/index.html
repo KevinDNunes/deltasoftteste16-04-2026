@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>DeltaSoft | Gestão de Viagens</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/signature_pad@4.1.7/dist/signature_pad.umd.min.js"></script>
+</head>
+<body>
+  <div class="app-shell">
+    <section id="loginScreen" class="login-screen">
+      <div class="login-wrap">
+        <div class="login-side">
+          <div class="brand hero-brand">
+            <div class="brand-badge">D</div>
+            <div>
+              <h1>DeltaSoft</h1>
+              <p>Sistema interno de viagens corporativas</p>
+            </div>
+          </div>
+          <div class="hero-cards">
+            <div class="hero-card"><span>📱</span><strong>Prático no celular</strong><p>Fluxo simples e pensado para uso rápido em campo.</p></div>
+            <div class="hero-card"><span>💼</span><strong>Controle interno</strong><p>Financeiro, técnico e admin com acessos separados.</p></div>
+            <div class="hero-card"><span>📄</span><strong>Termos e PDFs</strong><p>Documentos gerados dentro do próprio sistema.</p></div>
+          </div>
+        </div>
+        <div class="login-card glass">
+          <h2>Entrar no sistema</h2>
+          <p class="muted">Use um dos usuários de teste abaixo.</p>
+          <form id="loginForm" class="form">
+            <label>E-mail<input type="email" id="loginEmail" placeholder="seuemail@empresa.com" required /></label>
+            <label>Senha<input type="password" id="loginPassword" placeholder="Digite sua senha" required /></label>
+            <button class="btn btn-primary btn-lg" type="submit">Entrar</button>
+          </form>
+          <div class="divider"><span>Usuários de teste</span></div>
+          <div class="test-users">
+            <button class="btn btn-secondary test-user" type="button" data-email="admin@teste.com" data-password="123">Admin</button>
+            <button class="btn btn-secondary test-user" type="button" data-email="fin@teste.com" data-password="123">Financeiro</button>
+            <button class="btn btn-secondary test-user" type="button" data-email="tec@teste.com" data-password="123">Técnico</button>
+          </div>
+        </div>
+      </div>
+    </section>
+    <section id="appScreen" class="hidden">
+      <header class="topbar">
+        <div class="topbar-left">
+          <button id="menuToggle" class="icon-btn" type="button">☰</button>
+          <div class="brand brand-small">
+            <div class="brand-badge">D</div>
+            <div><h2>DeltaSoft</h2><p id="welcomeText">Bem-vindo</p></div>
+          </div>
+        </div>
+        <div class="topbar-right">
+          <button class="icon-btn cnpj-btn" type="button" onclick="openCompanyModal()">🏢</button>
+          <button id="logoutBtn" class="btn btn-light" type="button">Sair</button>
+        </div>
+      </header>
+      <div class="layout">
+        <aside id="sidebar" class="sidebar expanded">
+          <div class="profile-card">
+            <label for="profilePhotoInput" class="avatar-wrap" title="Adicionar foto">
+              <img id="profileAvatar" class="avatar" alt="Foto de perfil" />
+              <span class="avatar-edit">📷</span>
+            </label>
+            <input id="profilePhotoInput" type="file" accept="image/*" class="hidden-file" />
+            <div class="profile-meta"><strong id="profileName">Usuário</strong><p id="profileRole">Perfil</p></div>
+          </div>
+          <nav id="menuNav" class="menu"></nav>
+        </aside>
+        <main class="content"><section id="dashboardView"></section></main>
+      </div>
+    </section>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>
