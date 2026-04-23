@@ -3,9 +3,9 @@ const STORAGE_KEY = 'deltasoft_v9';
 const defaultData = {
   currentUserId: null,
   users: [
-    { id: 1, name: 'Kevin', email: 'admin@teste.com', password: '123', role: 'admin', photo: '' },
-    { id: 2, name: 'Financeiro Teste', email: 'fin@teste.com', password: '123', role: 'financeiro', photo: '' },
-    { id: 3, name: 'Técnico Teste', email: 'tec@teste.com', password: '123', role: 'tecnico', photo: '' }
+    { id: 1, name: 'Kevin', email: 'admin@teste.com', password: '123', role: 'admin', photo: '', cpf: '123.456.789-00' },
+    { id: 2, name: 'Financeiro Teste', email: 'fin@teste.com', password: '123', role: 'financeiro', photo: '', cpf: '987.654.321-00' },
+    { id: 3, name: 'Técnico Teste', email: 'tec@teste.com', password: '123', role: 'tecnico', photo: '', cpf: '456.789.123-00' }
   ],
   trips: [],
   cards: [],
@@ -74,6 +74,7 @@ const MENU = {
 };
 
 function qs(s) { return document.querySelector(s); }
+
 function loadData() {
   const raw = localStorage.getItem(STORAGE_KEY);
   if (!raw) {
@@ -82,17 +83,25 @@ function loadData() {
   }
   return JSON.parse(raw);
 }
+
 function saveData() { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+
 function currentUser() { return state.users.find(u => u.id === state.currentUserId) || null; }
+
 function nextId(arr) { return arr.length ? Math.max(...arr.map(x => x.id)) + 1 : 1; }
+
 function money(v) { return Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }); }
+
 function fmtDate(v) {
   if (!v) return '-';
   const [y, m, d] = v.split('-');
   return `${d}/${m}/${y}`;
 }
+
 function todayISO() { return new Date().toISOString().split('T')[0]; }
+
 function parseDate(v) { return v ? new Date(v + 'T12:00:00') : null; }
+
 function inRange(v, s, e) {
   if (!v) return false;
   const d = parseDate(v);
@@ -100,36 +109,51 @@ function inRange(v, s, e) {
   if (e && d > parseDate(e)) return false;
   return true;
 }
+
 function tripTotal(t) { return (t.expenses || []).reduce((a, b) => a + Number(b.amount || 0), 0); }
+
 function tripLabel(t) { return `Viagem ${t?.serviceLocation || '#' + t?.id}`; }
+
 function settlementAmount(t) { return Number(totalApprovedResources(t) || 0) - Number(tripTotal(t) || 0); }
+
 function settlementLabel(t) {
   const saldo = settlementAmount(t);
   if (saldo > 0) return `Valor a devolver: ${money(saldo)}`;
   if (saldo < 0) return `Valor a receber de volta: ${money(Math.abs(saldo))}`;
   return 'Sem diferença de acerto.';
 }
+
 function totalApprovedResources(t) {
   const base = Number(t.cardAmount || 0) + Number(t.cashAmount || 0);
   const extra = (t.extraFunds || []).filter(x => x.status === 'aprovado').reduce((a, b) => a + Number(b.totalAmount || 0), 0);
   return base + extra;
 }
+
 function activeTripForUser(id) { return state.trips.find(t => t.userId === id && !['finalizada', 'recusada'].includes(t.status)); }
-function companyCardInUse(company, excludeTripId = null) {
-  return state.trips.find(t =>
-    t.id !== excludeTripId &&
-    t.company === company &&
-    Number(t.cardAmount || 0) > 0 &&
-    !['finalizada', 'recusada'].includes(t.status) &&
-    t.cardInUse === true
-  );
-}
+
 function isTechLikeRole(role) { return ['tecnico', 'representante'].includes(role); }
-function getRoleLabel(r) { return r === 'admin' ? 'Administrador' : r === 'financeiro' ? 'Financeiro' : r === 'representante' ? 'Representante' : 'Técnico'; }
+
+function getRoleLabel(r) { return r === 'admin' ? 'Administrador(a)' : r === 'financeiro' ? 'Financeiro(a)' : r === 'representante' ? 'Representante' : 'Técnico(a)'; }
+
+function getCompanyByTrip(trip) { return state.companies.find(c => c.name === trip.company) || { name: trip.company, cnpj: '-' }; }
+
+function formatDateExtended() {
+  const now = new Date();
+  const dias = ['domingo', 'segunda-feira', 'terça-feira', 'quarta-feira', 'quinta-feira', 'sexta-feira', 'sábado'];
+  const meses = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+  const diaSemana = dias[now.getDay()];
+  const dia = now.getDate();
+  const mes = meses[now.getMonth()];
+  const ano = now.getFullYear();
+  const hora = now.toLocaleTimeString('pt-BR');
+  return `${diaSemana}, ${dia} de ${mes} de ${ano} às ${hora}`;
+}
+
 function avatarFallback(name = 'U') {
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160"><defs><linearGradient id="g" x1="0" x2="1"><stop stop-color="#0a4fab"/><stop offset="1" stop-color="#0f5ec9"/></linearGradient></defs><rect width="100%" height="100%" fill="url(#g)"/><text x="50%" y="54%" dominant-baseline="middle" text-anchor="middle" font-family="Arial" font-size="72" fill="white" font-weight="700">${(name[0] || 'U').toUpperCase()}</text></svg>`;
   return 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svg)));
 }
+
 function badge(s) {
   const map = {
     pendente: 'Pendente',
@@ -143,21 +167,38 @@ function badge(s) {
   };
   return `<span class="badge status-${s}">${map[s] || s}</span>`;
 }
+
 function sectionHead(t, s, actions = '') {
   return `<div class="page-head"><div><h3>${t}</h3><p>${s}</p></div>${actions}</div>`;
 }
+
 function renderMetric(l, v, i) {
   return `<article class="metric-card"><div><p class="metric-label">${l}</p><strong class="metric-value">${v}</strong></div><span class="metric-icon">${i}</span></article>`;
 }
+
 function modal(title, html, isImageViewer = false) {
-  closeModal();
+  const existingModal = qs('#activeModal');
+  if (existingModal) existingModal.remove();
+  if (signaturePad) signaturePad = null;
+  
   const wrap = document.createElement('div');
   wrap.id = 'activeModal';
   wrap.className = 'modal-backdrop' + (isImageViewer ? ' image-viewer-modal' : '');
   wrap.innerHTML = `<div class="modal"><div class="${isImageViewer ? 'modal-content' : ''}"><div class="page-head"><div><h3>${title}</h3></div><button class="btn btn-ghost" type="button" onclick="closeModal()">Fechar</button></div>${html}</div></div>`;
   document.body.appendChild(wrap);
+  setupMoneyFormatting();
 }
-function closeModal() { qs('#activeModal')?.remove(); signaturePad = null; pendingSignatureTripId = null; pendingSignatureForFinance = null; }
+
+function closeModal() { 
+  const modalEl = qs('#activeModal');
+  if (modalEl) modalEl.remove();
+  if (signaturePad) {
+    signaturePad.clear();
+    signaturePad = null;
+  }
+  pendingSignatureTripId = null;
+  pendingSignatureForFinance = null;
+}
 window.closeModal = closeModal;
 
 function fileToData(file) {
@@ -167,10 +208,6 @@ function fileToData(file) {
     reader.onerror = reject;
     reader.readAsDataURL(file);
   });
-}
-
-function indexDocument(obj) {
-  state.documentIndex.push({ id: nextId(state.documentIndex), ...obj });
 }
 
 function upsertDocument(matchFn, obj) {
@@ -185,8 +222,11 @@ function upsertDocument(matchFn, obj) {
 }
 
 function imagePreviewHtml(data, alt = 'Imagem do documento') {
-  if (!data || typeof data !== 'string' || !data.startsWith('data:image')) return '';
-  return `<div class="pdf-block"><p><strong>Foto anexada do termo assinado:</strong></p><img src="${data}" alt="${alt}" style="width:100%;max-width:780px;border-radius:14px;border:1px solid #d7e4f3;object-fit:contain"></div>`;
+  if (!data || typeof data !== 'string') return '';
+  if (data.startsWith('data:image')) {
+    return `<div class="pdf-block"><p><strong>Documento anexado:</strong></p><img src="${data}" alt="${alt}" style="width:100%;max-width:780px;border-radius:14px;border:1px solid #d7e4f3;object-fit:contain"></div>`;
+  }
+  return `<div class="pdf-block"><p><strong>Documento anexado:</strong> ${alt}</p><a href="${data}" download class="btn btn-secondary">Baixar documento</a></div>`;
 }
 
 function filteredDocuments(filters, role, userId) {
@@ -218,6 +258,10 @@ function filteredTrips(filters, role, userId) {
   return list.sort((a, b) => (b.startDate || '').localeCompare(a.startDate || ''));
 }
 
+function activeAndApprovedTripsForUser(userId) {
+  return state.trips.filter(t => t.userId === userId && ['aprovada', 'em_andamento'].includes(t.status));
+}
+
 function setupMoneyFormatting() {
   document.querySelectorAll('.money-field').forEach(el => {
     if (el.dataset.bound === '1') return;
@@ -240,17 +284,26 @@ function setupMoneyFormatting() {
 function initSignaturePad(canvasId, clearBtnId) {
   const canvas = qs(canvasId);
   if (!canvas) return null;
+  
+  const container = canvas.parentElement;
+  const width = Math.min(container.clientWidth - 32, 500);
+  canvas.width = width;
+  canvas.height = 180;
+  canvas.style.width = `${width}px`;
+  canvas.style.height = '180px';
+  
   const pad = new SignaturePad(canvas, {
     backgroundColor: 'rgb(255, 255, 255)',
     penColor: 'rgb(15, 94, 201)',
     minWidth: 1,
     maxWidth: 2
   });
+  
   const clearBtn = qs(clearBtnId);
   if (clearBtn) {
     clearBtn.addEventListener('click', () => pad.clear());
   }
-  canvas.addEventListener('touchstart', (e) => e.preventDefault());
+  
   return pad;
 }
 
@@ -266,9 +319,9 @@ function renderApp() {
   }
   refs.loginScreen.classList.add('hidden');
   refs.appScreen.classList.remove('hidden');
-  refs.welcomeText.textContent = `${user.name} • ${getRoleLabel(user.role)}`;
+  refs.welcomeText.textContent = `${user.name} • CPF: ${user.cpf || 'Não informado'} • ${getRoleLabel(user.role)}`;
   refs.profileName.textContent = user.name;
-  refs.profileRole.textContent = getRoleLabel(user.role);
+  refs.profileRole.textContent = `${getRoleLabel(user.role)} • CPF: ${user.cpf || 'Não informado'}`;
   refs.profileAvatar.src = user.photo || avatarFallback(user.name);
   renderMenu(user.role);
   renderView();
@@ -327,13 +380,20 @@ function renderAdminDashboard() {
 }
 
 function renderUsers() {
-  refs.dashboardView.innerHTML = `${sectionHead('Usuários e permissões', 'Cadastre pessoas e altere os perfis de acesso.', `<button class="btn btn-primary" type="button" onclick="openUserModal()">+ Novo usuário</button>`)}<section class="panel"><div class="stack">${state.users.map(u => `<div class="item-card"><div class="item-top"><div><h5 class="item-title">${u.name}</h5><p class="item-sub">${u.email}</p></div><div class="pill-inline">${getRoleLabel(u.role)}</div></div><div class="actions"><select onchange="changeRole(${u.id}, this.value)"><option value="admin" ${u.role === 'admin' ? 'selected' : ''}>Admin</option><option value="financeiro" ${u.role === 'financeiro' ? 'selected' : ''}>Financeiro</option><option value="tecnico" ${u.role === 'tecnico' ? 'selected' : ''}>Técnico</option><option value="representante" ${u.role === 'representante' ? 'selected' : ''}>Representante</option></select></div></div>`).join('')}</div></section>`;
+  refs.dashboardView.innerHTML = `${sectionHead('Usuários e permissões', 'Cadastre pessoas e altere os perfis de acesso.', `<button class="btn btn-primary" type="button" onclick="openUserModal()">+ Novo usuário</button>`)}<section class="panel"><div class="stack">${state.users.map(u => `<div class="item-card"><div class="item-top"><div><h5 class="item-title">${u.name}</h5><p class="item-sub">${u.email} • CPF: ${u.cpf || 'Não informado'}</p></div><div class="pill-inline">${getRoleLabel(u.role)}</div></div><div class="actions"><select onchange="changeRole(${u.id}, this.value)"><option value="admin" ${u.role === 'admin' ? 'selected' : ''}>Admin</option><option value="financeiro" ${u.role === 'financeiro' ? 'selected' : ''}>Financeiro</option><option value="tecnico" ${u.role === 'tecnico' ? 'selected' : ''}>Técnico</option><option value="representante" ${u.role === 'representante' ? 'selected' : ''}>Representante</option></select></div></div>`).join('')}</div></section>`;
 }
 
 function renderAdminFinance() {
   refs.dashboardView.innerHTML = `${sectionHead('Financeiro em tempo real', 'Acompanhe valores, recursos aprovados e documentos.')}<section class="panel"><table class="table"><thead><tr><th>Usuário</th><th>Empresa</th><th>Previsto</th><th>Recursos</th><th>Gastos</th><th>Status</th></tr></thead><tbody>${state.trips.length ? state.trips.map(t => {
     const u = state.users.find(x => x.id === t.userId);
-    return `<tr><td>${u?.name || '-'}</td><td>${t.company}</td><td>${money(t.plannedAmount)}</td><td>${money(totalApprovedResources(t))}</td><td>${money(tripTotal(t))}</td><td>${badge(t.status)}</td></tr>`;
+    return `<tr>
+      <td>${u?.name || '-'} • CPF: ${u?.cpf || '-'}</td>
+      <td>${t.company}</td>
+      <td>${money(t.plannedAmount)}</td>
+      <td>${money(totalApprovedResources(t))}</td>
+      <td>${money(tripTotal(t))}</td>
+      <td>${badge(t.status)}</td>
+    </tr>`;
   }).join('') : `<tr><td colspan="6">Sem viagens cadastradas.</td></tr>`}</tbody></table></section>`;
 }
 
@@ -346,7 +406,7 @@ function financeTripCard(t) {
   const canSignFinance = t.status === 'aguardando_assinatura_financeiro';
   const canApproveExtension = !!t.extensionRequestedUntil && t.extensionRequestedUntil !== t.extensionApprovedUntil;
 
-  return `<div class="item-card"><div class="item-top"><div><h5 class="item-title">${u?.name || '-'} • ${t.company}</h5><p class="item-sub">${fmtDate(t.startDate)} até ${fmtDate(t.endDate)} • Serviço em ${t.serviceLocation}</p></div><div>${badge(t.status)}</div></div><div class="small">Previsto: ${money(t.plannedAmount)} • Recursos aprovados: ${money(totalApprovedResources(t))}</div><div class="small">Pagamento: ${t.paymentTypeLabel || 'Ainda não definido'} • Gasto lançado: ${money(tripTotal(t))}</div><div class="small">Termo de liberação: ${t.releaseTermGeneratedFile ? t.releaseTermGeneratedFile.name : 'Não gerado'}</div><div class="small">Foto do termo: ${t.releaseTermPhotoFile ? t.releaseTermPhotoFile.name : 'Não anexada'}</div>${pendingExtras.length ? `<div class="note">Pedido extra pendente: ${pendingExtras.map(x => money(x.totalAmount)).join(', ')}</div>` : ''}<div class="actions">${canApprove ? `<button class="btn btn-success" type="button" onclick="openApproveModal(${t.id}, 'cartao')">Aceitar com cartão</button><button class="btn btn-secondary" type="button" onclick="openApproveModal(${t.id}, 'dinheiro')">Aceitar com dinheiro</button><button class="btn btn-warning" type="button" onclick="openApproveModal(${t.id}, 'misto')">Aceitar misto</button><button class="btn btn-danger" type="button" onclick="rejectTrip(${t.id})">Recusar</button>` : ''}${t.releaseTermGeneratedFile ? `<button class="btn btn-secondary" type="button" onclick="openReleaseTermPreview(${t.id})">Ver termo</button><a class="btn btn-ghost" href="${t.releaseTermGeneratedFile.data}" download="${t.releaseTermGeneratedFile.name}">Baixar termo</a>` : ''}${canUploadRelease ? `<button class="btn btn-primary" type="button" onclick="openReleaseTermModal(${t.id})">Anexar termo assinado</button>` : ''}${canApproveExtension ? `<button class="btn btn-warning" type="button" onclick="approveExtension(${t.id})">Aprovar dias adicionais</button>` : ''}${pendingExtras.length ? `<button class="btn btn-secondary" type="button" onclick="openExtraFundsApprovalModal(${t.id})">Analisar pedido extra</button>` : ''}${canClose ? `<button class="btn btn-primary" type="button" onclick="viewPendingSignature(${t.id})">Ver termo e assinar</button>` : ''}${canSignFinance ? `<button class="btn btn-primary" type="button" onclick="openFinanceSignature(${t.id})">Assinar termo final</button>` : ''}</div></div>`;
+  return `<div class="item-card"><div class="item-top"><div><h5 class="item-title">${u?.name || '-'} • CPF: ${u?.cpf || '-'} • ${t.company}</h5><p class="item-sub">${fmtDate(t.startDate)} até ${fmtDate(t.endDate)} • Serviço em ${t.serviceLocation}</p></div><div>${badge(t.status)}</div></div><div class="small">Previsto: ${money(t.plannedAmount)} • Recursos aprovados: ${money(totalApprovedResources(t))}</div><div class="small">Pagamento: ${t.paymentTypeLabel || 'Ainda não definido'} • Gasto lançado: ${money(tripTotal(t))}</div><div class="small">Termo de liberação: ${t.releaseTermGeneratedFile ? t.releaseTermGeneratedFile.name : 'Não gerado'}</div><div class="small">Documento do termo: ${t.releaseTermPhotoFile ? t.releaseTermPhotoFile.name : 'Não anexado'}</div>${pendingExtras.length ? `<div class="note">Pedido extra pendente: ${pendingExtras.map(x => money(x.totalAmount)).join(', ')}</div>` : ''}<div class="actions">${canApprove ? `<button class="btn btn-success" type="button" onclick="openApproveModal(${t.id}, 'cartao')">Aceitar com cartão</button><button class="btn btn-secondary" type="button" onclick="openApproveModal(${t.id}, 'dinheiro')">Aceitar com dinheiro</button><button class="btn btn-warning" type="button" onclick="openApproveModal(${t.id}, 'misto')">Aceitar misto</button><button class="btn btn-danger" type="button" onclick="rejectTrip(${t.id})">Recusar</button>` : ''}${t.releaseTermGeneratedFile ? `<button class="btn btn-secondary" type="button" onclick="openReleaseTermPreview(${t.id})">Ver termo</button><a class="btn btn-ghost" href="${t.releaseTermGeneratedFile.data}" download="${t.releaseTermGeneratedFile.name}">Baixar termo</a>` : ''}${canUploadRelease ? `<button class="btn btn-primary" type="button" onclick="openReleaseTermModal(${t.id})">Anexar termo assinado</button>` : ''}${canApproveExtension ? `<button class="btn btn-warning" type="button" onclick="approveExtension(${t.id})">Aprovar dias adicionais</button>` : ''}${pendingExtras.length ? `<button class="btn btn-secondary" type="button" onclick="openExtraFundsApprovalModal(${t.id})">Analisar pedido extra</button>` : ''}${canClose ? `<button class="btn btn-primary" type="button" onclick="viewPendingSignature(${t.id})">Ver termo e assinar</button>` : ''}${canSignFinance ? `<button class="btn btn-primary" type="button" onclick="openFinanceSignature(${t.id})">Assinar termo final</button>` : ''}</div></div>`;
 }
 
 function renderFinanceDashboard() {
@@ -369,7 +429,7 @@ function renderCards() {
   const inUse = state.trips.filter(t => ['aprovada', 'em_andamento', 'aguardando_acerto', 'aguardando_assinatura_financeiro'].includes(t.status) && Number(t.cardAmount || 0) > 0 && t.cardInUse === true);
   refs.dashboardView.innerHTML = `${sectionHead('Cartões corporativos', 'Cadastre os dados do cartão e acompanhe os cartões em uso.', `<button class="btn btn-primary" type="button" onclick="openCardModal()">+ Novo cartão</button>`)}<section class="grid two-col"><div class="panel"><h4>Cartões cadastrados</h4><div class="stack">${state.cards.length ? state.cards.map(c => `<div class="item-card"><div class="item-top"><div><h5 class="item-title">${c.company} • ${c.brand} • Final ${c.last4}</h5><p class="item-sub">Titular: ${c.holderName}</p></div><div class="pill-inline">${c.active ? 'Ativo' : 'Inativo'}</div></div><div class="small">Validade: ${c.expiry}</div><div class="small">Limite: ${money(c.limit)}</div></div>`).join('') : `<div class="empty">Nenhum cartão cadastrado ainda.</div>`}</div></div><div class="panel"><h4>Cartões em uso</h4><div class="stack">${inUse.length ? inUse.map(t => {
     const u = state.users.find(x => x.id === t.userId);
-    return `<div class="item-card"><strong class="item-title">${u?.name || '-'} • ${t.company}</strong><p class="item-sub">${fmtDate(t.startDate)} até ${fmtDate(t.endDate)}</p><div class="small">Valor em cartão em uso: ${money(t.cardAmount || 0)}</div><div class="small">Status da viagem: ${t.status}</div></div>`;
+    return `<div class="item-card"><strong class="item-title">${u?.name || '-'} • CPF: ${u?.cpf || '-'} • ${t.company}</strong><p class="item-sub">${fmtDate(t.startDate)} até ${fmtDate(t.endDate)}</p><div class="small">Valor em cartão em uso: ${money(t.cardAmount || 0)}</div><div class="small">Status da viagem: ${t.status}</div></div>`;
   }).join('') : `<div class="empty">Nenhum cartão está sendo usado no momento.</div>`}</div></div></section>`;
 }
 
@@ -390,11 +450,6 @@ function renderMyTrips() {
   const u = currentUser();
   const list = state.trips.filter(t => t.userId === u.id);
   refs.dashboardView.innerHTML = `${sectionHead('Minhas viagens', 'Acompanhe cada etapa da sua solicitação.', `${!activeTripForUser(u.id) ? `<button class="btn btn-primary" type="button" onclick="openTripModal()">+ Nova viagem</button>` : ''}`)}<section class="panel"><div class="stack">${list.length ? list.map(t => techTripCard(t)).join('') : `<div class="empty">Nenhuma viagem criada ainda.</div>`}</div></section>`;
-}
-
-function expenseGroupCard(trip) {
-  const extras = (trip.extraFunds || []).length ? (trip.extraFunds || []).map(x => `<div class="small">Pedido extra: ${money(x.totalAmount)} • ${x.status}</div>`).join('') : '';
-  return `<div class="item-card"><div class="item-top"><div><h5 class="item-title">${trip.company}</h5><p class="item-sub">${fmtDate(trip.startDate)} até ${fmtDate(trip.endDate)} • Total ${money(tripTotal(trip))}</p></div><div>${badge(trip.status)}</div></div><div class="stack" style="margin-top:12px">${(trip.expenses || []).length ? (trip.expenses || []).map((exp, idx) => `<div class="upload-preview"><div class="upload-preview-left">${exp.receiptPreview ? `<img src="${exp.receiptPreview}" style="width:52px;height:52px;object-fit:cover;border-radius:10px;border:1px solid #dbe6f3">` : `<div style="width:52px;height:52px;border-radius:10px;background:#eef6ff;display:grid;place-items:center">🧾</div>`}<div><strong>${exp.description}</strong><br><span class="small">${money(exp.amount)} • ${exp.method} • ${fmtDate(exp.date)}</span><br><span class="small">${exp.receiptName || 'Sem comprovante'}</span></div></div><div class="upload-preview-actions"><button class="action-icon view-icon" onclick="viewReceipt(${trip.id}, ${idx})" title="Visualizar comprovante">🔍</button><button class="action-icon delete-icon" onclick="deleteExpense(${trip.id}, ${idx})" title="Excluir gasto">🗑️</button></div></div>`).join('') : `<div class="small">Nenhum gasto lançado ainda.</div>`}${extras}${['aprovada', 'em_andamento'].includes(trip.status) ? `<div class="actions"><button class="btn btn-primary" type="button" onclick="openExpenseModal(${trip.id})">+ Adicionar gasto</button><button class="btn btn-secondary" type="button" onclick="openExtraFundsModal(${trip.id})">Solicitar mais dinheiro</button></div>` : ''}</div></div>`;
 }
 
 function viewReceipt(tripId, expenseIndex) {
@@ -449,10 +504,16 @@ function deleteExpense(tripId, expenseIndex) {
 }
 window.deleteExpense = deleteExpense;
 
+function expenseGroupCard(trip) {
+  const extras = (trip.extraFunds || []).length ? (trip.extraFunds || []).map(x => `<div class="small">Pedido extra: ${money(x.totalAmount)} • ${x.status}</div>`).join('') : '';
+  return `<div class="item-card"><div class="item-top"><div><h5 class="item-title">${trip.company}</h5><p class="item-sub">${fmtDate(trip.startDate)} até ${fmtDate(trip.endDate)} • Total ${money(tripTotal(trip))}</p></div><div>${badge(trip.status)}</div></div><div class="stack" style="margin-top:12px">${(trip.expenses || []).length ? (trip.expenses || []).map((exp, idx) => `<div class="upload-preview"><div class="upload-preview-left">${exp.receiptPreview ? `<img src="${exp.receiptPreview}" style="width:52px;height:52px;object-fit:cover;border-radius:10px;border:1px solid #dbe6f3">` : `<div style="width:52px;height:52px;border-radius:10px;background:#eef6ff;display:grid;place-items:center">🧾</div>`}<div><strong>${exp.description}</strong><br><span class="small">${money(exp.amount)} • ${exp.method} • ${fmtDate(exp.date)}</span><br><span class="small">${exp.receiptName || 'Sem comprovante'}</span></div></div><div class="upload-preview-actions"><button class="action-icon view-icon" onclick="viewReceipt(${trip.id}, ${idx})" title="Visualizar comprovante">🔍</button><button class="action-icon delete-icon" onclick="deleteExpense(${trip.id}, ${idx})" title="Excluir gasto">🗑️</button></div></div>`).join('') : `<div class="small">Nenhum gasto lançado ainda.</div>`}${extras}${['aprovada', 'em_andamento'].includes(trip.status) ? `<div class="actions"><button class="btn btn-primary" type="button" onclick="openExpenseModal(${trip.id})">+ Adicionar gasto</button><button class="btn btn-secondary" type="button" onclick="openExtraFundsModal(${trip.id})">Solicitar mais dinheiro</button></div>` : ''}</div></div>`;
+}
+
 function renderExpenses() {
   const u = currentUser();
-  const list = state.trips.filter(t => t.userId === u.id);
-  refs.dashboardView.innerHTML = `${sectionHead('Meus gastos', 'Adicione comprovantes por arquivo ou foto. Clique em 🔍 para visualizar o comprovante e em 🗑️ para excluir.')}<section class="panel"><div class="stack">${list.length ? list.map(expenseGroupCard).join('') : `<div class="empty">Nenhuma viagem disponível.</div>`}</div></section>`;
+  // Mostra apenas viagens em andamento ou aprovadas (ativas)
+  const list = activeAndApprovedTripsForUser(u.id);
+  refs.dashboardView.innerHTML = `${sectionHead('Meus gastos', 'Apenas gastos da viagem atual em andamento.')}<section class="panel"><div class="stack">${list.length ? list.map(expenseGroupCard).join('') : `<div class="empty">Nenhuma viagem em andamento no momento.</div>`}</div></section>`;
 }
 
 function renderHistory() {
@@ -463,7 +524,7 @@ function renderHistory() {
 
 function historyCard(t) {
   const u = state.users.find(x => x.id === t.userId);
-  return `<div class="item-card"><div class="item-top"><div><h5 class="item-title">${t.company}${!isTechLikeRole(currentUser().role) ? ` • ${u?.name || '-'}` : ''}</h5><p class="item-sub">${fmtDate(t.startDate)} até ${fmtDate(t.endDate)} • ${t.serviceLocation}</p></div><div>${badge(t.status)}</div></div><div class="small">Previsto: ${money(t.plannedAmount)} • Recursos: ${money(totalApprovedResources(t))} • Gastos: ${money(tripTotal(t))}</div><div class="small">Termo de liberação: ${t.releaseTermGeneratedFile ? t.releaseTermGeneratedFile.name : 'Não gerado'}</div><div class="small">Foto do termo: ${t.releaseTermPhotoFile ? t.releaseTermPhotoFile.name : 'Não anexada'}</div><div class="small">Termo final: ${t.finalTermFile ? t.finalTermFile.name : 'Não anexado'}</div><div class="small">PDF final: ${t.finalReportFile ? t.finalReportFile.name : 'Não gerado'}</div><div class="actions">${t.releaseTermGeneratedFile ? `<button class="btn btn-secondary" type="button" onclick="openReleaseTermPreview(${t.id})">Abrir termo</button>` : ''}${t.releaseTermGeneratedFile ? `<a class="btn btn-ghost" href="${t.releaseTermGeneratedFile.data}" download="${t.releaseTermGeneratedFile.name}">Baixar termo</a>` : ''}</div></div>`;
+  return `<div class="item-card"><div class="item-top"><div><h5 class="item-title">${t.company}${!isTechLikeRole(currentUser().role) ? ` • ${u?.name || '-'} • CPF: ${u?.cpf || '-'}` : ''}</h5><p class="item-sub">${fmtDate(t.startDate)} até ${fmtDate(t.endDate)} • ${t.serviceLocation}</p></div><div>${badge(t.status)}</div></div><div class="small">Previsto: ${money(t.plannedAmount)} • Recursos: ${money(totalApprovedResources(t))} • Gastos: ${money(tripTotal(t))}</div><div class="small">Termo de liberação: ${t.releaseTermGeneratedFile ? t.releaseTermGeneratedFile.name : 'Não gerado'}</div><div class="small">Documento do termo: ${t.releaseTermPhotoFile ? t.releaseTermPhotoFile.name : 'Não anexado'}</div><div class="small">Termo final: ${t.finalTermFile ? t.finalTermFile.name : 'Não anexado'}</div><div class="small">PDF final: ${t.finalReportFile ? t.finalReportFile.name : 'Não gerado'}</div><div class="actions">${t.releaseTermGeneratedFile ? `<button class="btn btn-secondary" type="button" onclick="openReleaseTermPreview(${t.id})">Abrir termo</button>` : ''}${t.releaseTermGeneratedFile ? `<a class="btn btn-ghost" href="${t.releaseTermGeneratedFile.data}" download="${t.releaseTermGeneratedFile.name}">Baixar termo</a>` : ''}</div></div>`;
 }
 
 function renderReports() {
@@ -474,7 +535,7 @@ function renderReports() {
 
 function documentCard(d) {
   const u = state.users.find(x => x.id === d.userId);
-  return `<div class="item-card"><div class="item-top"><div><h5 class="item-title">${d.title}</h5><p class="item-sub">${!isTechLikeRole(currentUser().role) ? `${u?.name || '-'} • ` : ''}${fmtDate(d.docDate)} • ${d.type}</p></div><div class="pill-inline">PDF</div></div><div class="actions"><a class="btn btn-secondary" href="${d.fileData}" download="${d.fileName}">Baixar</a><button class="btn btn-ghost" type="button" onclick="openDocumentSnapshot(${d.id})">Visualizar</button></div></div>`;
+  return `<div class="item-card"><div class="item-top"><div><h5 class="item-title">${d.title}</h5><p class="item-sub">${!isTechLikeRole(currentUser().role) ? `${u?.name || '-'} • CPF: ${u?.cpf || '-'} • ` : ''}${fmtDate(d.docDate)} • ${d.type}</p></div><div class="pill-inline">PDF</div></div><div class="actions"><a class="btn btn-secondary" href="${d.fileData}" download="${d.fileName}">Baixar</a><button class="btn btn-ghost" type="button" onclick="openDocumentSnapshot(${d.id})">Visualizar</button></div></div>`;
 }
 
 function updateReportFilters() {
@@ -516,7 +577,7 @@ function nextSteps(trip) {
 }
 
 function openUserModal() {
-  modal('Cadastrar usuário', `<form class="form" onsubmit="submitUser(event)"><label>Nome completo<input id="userName" required></label><label>E-mail<input id="userEmail" type="email" required></label><label>Senha<input id="userPassword" required></label><label>Perfil<select id="userRole" required><option value="tecnico">Técnico</option><option value="representante">Representante</option><option value="financeiro">Financeiro</option><option value="admin">Admin</option></select></label><button class="btn btn-primary btn-lg" type="submit">Salvar usuário</button></form>`);
+  modal('Cadastrar usuário', `<form class="form" onsubmit="submitUser(event)"><label>Nome completo<input id="userName" required></label><label>E-mail<input id="userEmail" type="email" required></label><label>Senha<input id="userPassword" required></label><label>CPF<input id="userCpf" placeholder="000.000.000-00"></label><label>Perfil<select id="userRole" required><option value="tecnico">Técnico(a)</option><option value="representante">Representante</option><option value="financeiro">Financeiro(a)</option><option value="admin">Administrador(a)</option></select></label><button class="btn btn-primary btn-lg" type="submit">Salvar usuário</button></form>`);
 }
 window.openUserModal = openUserModal;
 
@@ -528,7 +589,8 @@ function submitUser(ev) {
     email: qs('#userEmail').value.trim().toLowerCase(),
     password: qs('#userPassword').value,
     role: qs('#userRole').value,
-    photo: ''
+    photo: '',
+    cpf: qs('#userCpf').value || 'Não informado'
   });
   saveData();
   closeModal();
@@ -558,18 +620,11 @@ function openCompanyModal() {
             <strong class="item-title" style="font-size:1.1rem;">🏢 ${c.name}</strong>
           </div>
           <label>CNPJ
-            <input
-              id="company-${c.id}"
-              value="${c.cnpj}"
-              ${isAdmin ? 'required' : 'disabled'}
-            >
+            <input id="company-${c.id}" value="${c.cnpj}" ${isAdmin ? 'required' : 'disabled'}>
           </label>
         </div>
       `).join('')}
-      ${isAdmin
-        ? `<button class="btn btn-primary btn-lg" type="submit">Salvar CNPJs</button>`
-        : `<div class="note">Somente o administrador pode editar os CNPJs.</div>`
-      }
+      ${isAdmin ? `<button class="btn btn-primary btn-lg" type="submit">Salvar CNPJs</button>` : `<div class="note">Somente o administrador pode editar os CNPJs.</div>`}
     </form>`
   );
 }
@@ -577,18 +632,15 @@ window.openCompanyModal = openCompanyModal;
 
 function submitCompanies(ev) {
   ev.preventDefault();
-
   const user = currentUser();
   if (user?.role !== 'admin') {
     alert('Somente o administrador pode editar os CNPJs.');
     return;
   }
-
   state.companies.forEach(c => {
     const input = qs(`#company-${c.id}`);
     if (input) c.cnpj = input.value.trim();
   });
-
   saveData();
   closeModal();
   renderApp();
@@ -603,12 +655,9 @@ function openCardModal() {
   if (expiryInput) {
     expiryInput.addEventListener('input', function(e) {
       let value = this.value.replace(/\D/g, '');
-      if (value.length >= 2) {
-        value = value.slice(0, 2) + '/' + value.slice(2, 4);
-      }
+      if (value.length >= 2) value = value.slice(0, 2) + '/' + value.slice(2, 4);
       this.value = value;
     });
-    
     expiryInput.addEventListener('blur', function() {
       let value = this.value;
       const regex = /^(\d{2})\/(\d{2})$/;
@@ -669,7 +718,7 @@ function submitCard(ev) {
 window.submitCard = submitCard;
 
 function openTripModal() {
-  modal('Nova viagem', `<form class="form" onsubmit="submitTrip(event)"><div class="card-grid"><label>Empresa<select id="tripCompany" required>${state.companies.map(c => `<option value="${c.name}">${c.name}</option>`).join('')}</select></label><label>Serviço / local<input id="tripServiceLocation" required placeholder="Cidade, cliente ou unidade"></label><label>Data inicial<input id="tripStartDate" type="date" required></label><label>Data final<input id="tripEndDate" type="date" required></label><label>Valor previsto<div class="money-input"><input type="text" id="tripPlannedDisplay" class="money-field" data-target="tripPlannedAmount" inputmode="numeric" required placeholder="0,00"></div><input type="hidden" id="tripPlannedAmount"></label></div><button class="btn btn-primary btn-lg" type="submit">Enviar solicitação para o financeiro</button></form>`);
+  modal('Nova viagem', `<form class="form" onsubmit="submitTrip(event)"><div class="card-grid"><label>Empresa<select id="tripCompany" required>${state.companies.map(c => `<option value="${c.name}">${c.name}</option>`).join('')}</select></label><label>Cidade do serviço<input id="tripCity" required placeholder="Ex: São Paulo, Porto Alegre..."></label><label>Cliente<input id="tripServiceLocation" required placeholder="Nome do cliente"></label><label>Data inicial<input id="tripStartDate" type="date" required></label><label>Data final<input id="tripEndDate" type="date" required></label><label>Valor previsto<div class="money-input"><input type="text" id="tripPlannedDisplay" class="money-field" data-target="tripPlannedAmount" inputmode="numeric" required placeholder="0,00"></div><input type="hidden" id="tripPlannedAmount"></label></div><button class="btn btn-primary btn-lg" type="submit">Enviar solicitação para o financeiro</button></form>`);
   setupMoneyFormatting();
   const start = qs('#tripStartDate');
   const end = qs('#tripEndDate');
@@ -685,11 +734,17 @@ window.openTripModal = openTripModal;
 function submitTrip(ev) {
   ev.preventDefault();
   const user = currentUser();
+  const city = qs('#tripCity').value;
+  const cliente = qs('#tripServiceLocation').value;
+  const fullServiceLocation = `${city} - ${cliente}`;
+  
   state.trips.push({
     id: nextId(state.trips),
     userId: user.id,
     company: qs('#tripCompany').value,
-    serviceLocation: qs('#tripServiceLocation').value,
+    city: city,
+    serviceLocationDetail: cliente,
+    serviceLocation: fullServiceLocation,
     startDate: qs('#tripStartDate').value,
     endDate: qs('#tripEndDate').value,
     plannedAmount: Number(qs('#tripPlannedAmount').value || 0),
@@ -730,10 +785,8 @@ function openApproveModal(id, type) {
   if (!trip) return;
 
   const availableCards = state.cards.filter(c => c.company === trip.company && c.active === true);
-  
   const cardsInUse = state.trips.filter(t => t.id !== id && t.cardInUse === true && t.company === trip.company).map(t => t.cardId);
   const freeCards = availableCards.filter(c => !cardsInUse.includes(c.id));
-  
   const labelMap = { cartao: 'Cartão', dinheiro: 'Dinheiro', misto: 'Misto' };
 
   let cardSelectHtml = '';
@@ -819,12 +872,10 @@ function submitApproval(ev, id, type) {
     alert('Informe o valor a ser liberado no cartão.');
     return;
   }
-  
   if (type === 'dinheiro' && cashAmount === 0) {
     alert('Informe o valor a ser liberado em dinheiro.');
     return;
   }
-  
   if (type === 'misto' && cardAmount === 0 && cashAmount === 0) {
     alert('Informe pelo menos um valor para liberação mista.');
     return;
@@ -835,9 +886,7 @@ function submitApproval(ev, id, type) {
   trip.cardAmount = cardAmount;
   trip.cashAmount = cashAmount;
   trip.cardId = selectedCardId;
-  if (cardAmount > 0) {
-    trip.cardInUse = true;
-  }
+  if (cardAmount > 0) trip.cardInUse = true;
   trip.status = 'aguardando_assinatura';
 
   const user = state.users.find(u => u.id === trip.userId);
@@ -870,9 +919,7 @@ window.submitApproval = submitApproval;
 function rejectTrip(id) {
   const trip = state.trips.find(t => t.id === id);
   if (!trip) return;
-  if (trip.cardInUse) {
-    trip.cardInUse = false;
-  }
+  if (trip.cardInUse) trip.cardInUse = false;
   trip.status = 'recusada';
   saveData();
   renderApp();
@@ -886,48 +933,87 @@ function openReleaseTermModal(id) {
   const downloadBtn = trip.releaseTermGeneratedFile
     ? `<a class="btn btn-secondary" href="${trip.releaseTermGeneratedFile.data}" download="${trip.releaseTermGeneratedFile.name}">Baixar termo em PDF</a>`
     : '';
-  modal('Termo de liberação e anexo da foto assinada', `<form class="form" onsubmit="submitReleaseTerm(event, ${id})"><div class="pdf-preview">${buildReleaseTermSnapshot(trip, user)}</div><div class="actions" style="margin-top:12px; margin-bottom:8px;">${downloadBtn}<button class="btn btn-ghost" type="button" onclick="openReleaseTermPreview(${id})">Visualizar termo</button></div><label>Foto do termo assinado por ambas as partes (boa resolução)<input id="releaseTermFile" type="file" accept="image/*" required></label><button class="btn btn-primary btn-lg" type="submit">Salvar termo e liberar viagem</button></form>`);
+    
+  modal('Termo de liberação e anexo do documento assinado', `
+    <form class="form" id="releaseTermForm" onsubmit="submitReleaseTerm(event, ${id})">
+      <div class="pdf-preview" style="max-height: 300px; overflow-y: auto;">
+        ${buildReleaseTermSnapshot(trip, user)}
+      </div>
+      <div class="actions" style="margin-top:12px; margin-bottom:8px;">
+        ${downloadBtn}
+        <button class="btn btn-ghost" type="button" onclick="openReleaseTermPreview(${id})">Visualizar termo</button>
+      </div>
+      <label>
+        Anexar documento do termo assinado por ambas as partes (PDF, imagem, etc.)
+        <input id="releaseTermFile" type="file" accept="*/*" required>
+      </label>
+      <button id="submitReleaseTermBtn" class="btn btn-primary btn-lg" type="submit">Salvar termo e liberar viagem</button>
+    </form>
+  `);
 }
-window.openReleaseTermModal = openReleaseTermModal;
 
 async function submitReleaseTerm(ev, id) {
   ev.preventDefault();
+  
   const trip = state.trips.find(t => t.id === id);
-  const fileInput = qs('#releaseTermFile');
-  const file = fileInput?.files?.[0];
+  const fileInput = document.getElementById('releaseTermFile');
+  const submitBtn = document.getElementById('submitReleaseTermBtn');
+  
   if (!trip) {
     alert('Viagem não encontrada.');
     return;
   }
-  if (!file) {
-    alert('Anexe a foto do termo assinado para liberar a viagem.');
+  
+  if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
+    alert('Anexe o documento do termo assinado para liberar a viagem.');
     return;
   }
-  const fileData = await fileToData(file);
-  trip.releaseTermFile = { name: file.name, data: fileData };
-  trip.releaseTermPhotoFile = { name: file.name, data: fileData };
-  trip.status = 'aprovada';
-  trip.accountabilityDeadline = addBusinessDaysISO(trip.endDate, 3);
-
-  const user = state.users.find(u => u.id === trip.userId);
-  upsertDocument(
-    d => d.tripId === trip.id && d.type === 'Termo de liberação',
-    {
-      userId: trip.userId,
-      tripId: trip.id,
-      title: `Termo de liberação - ${trip.serviceLocation}`,
-      type: 'Termo de liberação',
-      fileName: trip.releaseTermGeneratedFile?.name || `termo_liberacao_viagem_${trip.id}.pdf`,
-      fileData: trip.releaseTermGeneratedFile?.data || fileData,
-      docDate: todayISO(),
-      snapshotHtml: buildReleaseTermSnapshot(trip, user)
+  
+  const file = fileInput.files[0];
+  
+  try {
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Salvando...';
     }
-  );
+    
+    const fileData = await fileToData(file);
+    
+    trip.releaseTermFile = { name: file.name, data: fileData };
+    trip.releaseTermPhotoFile = { name: file.name, data: fileData };
+    trip.status = 'aprovada';
+    trip.accountabilityDeadline = addBusinessDaysISO(trip.endDate, 3);
 
-  saveData();
-  closeModal();
-  renderApp();
-  alert('Termo salvo e viagem liberada com sucesso.');
+    const user = state.users.find(u => u.id === trip.userId);
+    
+    upsertDocument(
+      d => d.tripId === trip.id && d.type === 'Termo de liberação',
+      {
+        userId: trip.userId,
+        tripId: trip.id,
+        title: `Termo de liberação - ${trip.serviceLocation}`,
+        type: 'Termo de liberação',
+        fileName: trip.releaseTermGeneratedFile?.name || `termo_liberacao_viagem_${trip.id}.pdf`,
+        fileData: trip.releaseTermGeneratedFile?.data || fileData,
+        docDate: todayISO(),
+        snapshotHtml: buildReleaseTermSnapshot(trip, user)
+      }
+    );
+
+    saveData();
+    closeModal();
+    renderApp();
+    alert('✅ Termo salvo e viagem liberada com sucesso!');
+    
+  } catch (error) {
+    console.error('Erro ao salvar termo:', error);
+    alert('❌ Ocorreu um erro ao salvar o termo: ' + error.message);
+    
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Salvar termo e liberar viagem';
+    }
+  }
 }
 window.submitReleaseTerm = submitReleaseTerm;
 
@@ -1087,7 +1173,7 @@ function openFinishWithSignature(id) {
       
       <label>ASSINATURA ELETRÔNICA (usuário)</label>
       <div class="signature-pad-container">
-        <canvas id="userSignatureCanvas" class="signature-canvas" width="500" height="200" style="touch-action: none;"></canvas>
+        <canvas id="userSignatureCanvas" class="signature-canvas" style="touch-action: none;"></canvas>
         <div class="signature-actions">
           <button type="button" class="btn btn-secondary" id="clearUserSignature">Limpar</button>
         </div>
@@ -1102,6 +1188,7 @@ function openFinishWithSignature(id) {
     signaturePad = initSignaturePad('#userSignatureCanvas', '#clearUserSignature');
   }, 100);
 }
+window.openFinishWithSignature = openFinishWithSignature;
 
 async function submitFinishWithSignature(ev) {
   ev.preventDefault();
@@ -1178,10 +1265,10 @@ function viewPendingSignature(id) {
     </div>
     <div class="pdf-preview">
       ${buildFullTermSnapshot(trip, user, null)}
-      <div class="signature-preview">
-        <p><strong>Assinatura do usuário:</strong></p>
-        <img src="${trip.userSignature}" style="max-width: 300px; border: 1px solid #ccc; border-radius: 8px;">
-        <p class="small">Assinado em: ${fmtDate(trip.userSignatureDate)}</p>
+      <div class="signature-preview" style="margin-top: 16px; padding: 16px; background: #f8faff; border-radius: 12px;">
+        <p><strong>✅ Assinatura do(a) colaborador(a) (já realizada):</strong></p>
+        <img src="${trip.userSignature}" style="max-width: 300px; border: 1px solid #ccc; border-radius: 8px; background: white;">
+        <p class="small" style="margin-top: 8px;">Assinado eletronicamente em: ${fmtDate(trip.userSignatureDate)}</p>
       </div>
       <div class="actions" style="margin-top: 20px;">
         <button class="btn btn-success" onclick="openFinanceSignature(${id})">Assinar como financeiro</button>
@@ -1201,17 +1288,21 @@ function openFinanceSignature(id) {
 
   modal('Assinatura do financeiro', `
     <form class="form" onsubmit="submitFinanceSignature(event)">
-      <div class="pdf-preview">${buildFullTermSnapshot(trip, user, null)}</div>
-
-      <div class="signature-preview">
-        <p><strong>Assinatura do usuário:</strong></p>
-        <img src="${trip.userSignature}" style="max-width: 300px; border: 1px solid #ccc; border-radius: 8px;">
-        <p class="small">Assinado em: ${fmtDate(trip.userSignatureDate)}</p>
+      <div class="pdf-preview" style="max-height: 400px; overflow-y: auto;">
+        ${buildFullTermSnapshot(trip, user, null)}
       </div>
 
-      <label>ASSINATURA ELETRÔNICA (financeiro)</label>
+      <div class="signature-preview" style="margin: 16px 0; padding: 16px; background: #f8faff; border-radius: 12px;">
+        <p><strong>✅ Assinatura do(a) colaborador(a) (já realizada):</strong></p>
+        <img src="${trip.userSignature}" style="max-width: 280px; border: 1px solid #ccc; border-radius: 8px; background: white;">
+        <p class="small" style="margin-top: 8px;">Assinado eletronicamente em: ${fmtDate(trip.userSignatureDate)}</p>
+      </div>
+
+      <div style="border-top: 2px solid var(--line); margin: 16px 0;"></div>
+
+      <label><strong>✍️ ASSINATURA ELETRÔNICA (financeiro)</strong></label>
       <div class="signature-pad-container">
-        <canvas id="financeSignatureCanvas" class="signature-canvas" width="500" height="200" style="touch-action: none;"></canvas>
+        <canvas id="financeSignatureCanvas" class="signature-canvas" style="touch-action: none;"></canvas>
         <div class="signature-actions">
           <button type="button" class="btn btn-secondary" id="clearFinanceSignature">Limpar</button>
         </div>
@@ -1226,6 +1317,7 @@ function openFinanceSignature(id) {
     signaturePad = initSignaturePad('#financeSignatureCanvas', '#clearFinanceSignature');
   }, 100);
 }
+window.openFinanceSignature = openFinanceSignature;
 
 async function submitFinanceSignature(ev) {
   ev.preventDefault();
@@ -1301,21 +1393,25 @@ function generateFullTermPdf(trip, user) {
   const doc = new jsPDF();
   let y = 18;
   const saldo = settlementAmount(trip);
+  const company = getCompanyByTrip(trip);
+  const dataExtenso = formatDateExtended();
+  const financeiroUser = currentUser();
 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(18);
-  doc.text('DeltaSoft - TERMO FINAL DE PRESTACAO DE CONTAS', 14, y);
+  doc.text('DeltaSoft - TERMO FINAL DE PRESTAÇÃO DE CONTAS', 14, y);
   y += 10;
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(11);
   [
     tripLabel(trip),
-    `${getRoleLabel(user?.role)}: ${user?.name || '-'}`,
-    `Empresa: ${trip.company}`,
-    `Periodo: ${fmtDate(trip.startDate)} ate ${fmtDate(trip.endDate)}`,
-    `Local do servico: ${trip.serviceLocation}`,
-    `Prazo para acerto com o financeiro: ${fmtDate(trip.accountabilityDeadline)} (3 dias uteis)`
+    `Colaborador(a): ${user?.name || '-'} • CPF: ${user?.cpf || 'Não informado'}`,
+    `Financeiro(a): ${financeiroUser?.name || '-'} • CPF: ${financeiroUser?.cpf || 'Não informado'}`,
+    `Empresa: ${company.name} • CNPJ: ${company.cnpj}`,
+    `Período: ${fmtDate(trip.startDate)} até ${fmtDate(trip.endDate)}`,
+    `Local do serviço: ${trip.serviceLocation}`,
+    `Prazo para acerto com o financeiro: ${fmtDate(trip.accountabilityDeadline)} (3 dias úteis)`
   ].forEach(line => { doc.text(line, 14, y); y += 7; });
 
   y += 3;
@@ -1324,12 +1420,14 @@ function generateFullTermPdf(trip, user) {
   doc.setFont('helvetica', 'normal');
   [
     `Valor previsto: ${money(trip.plannedAmount)}`,
-    `Valor liberado em cartao: ${money(trip.cardAmount || 0)}`,
+    `Forma de liberação: ${trip.paymentTypeLabel || '-'}`,
+    `Valor liberado em cartão: ${money(trip.cardAmount || 0)}`,
     `Valor liberado em dinheiro: ${money(trip.cashAmount || 0)}`,
+    `Total liberado ao(à) colaborador(a): ${money(Number(trip.cardAmount || 0) + Number(trip.cashAmount || 0))}`,
     `Extras aprovados: ${money((trip.extraFunds || []).filter(x => x.status === 'aprovado').reduce((a, b) => a + Number(b.totalAmount || 0), 0))}`,
     `Total de recursos: ${money(totalApprovedResources(trip))}`,
     `Total de gastos: ${money(tripTotal(trip))}`,
-    `${saldo >= 0 ? 'Valor a devolver pelo usuario' : 'Valor a receber de volta pelo usuario'}: ${money(Math.abs(saldo))}`
+    `${saldo >= 0 ? 'Valor a devolver pelo(a) usuário(a)' : 'Valor a receber de volta pelo(a) usuário(a)'}: ${money(Math.abs(saldo))}`
   ].forEach(line => { doc.text(line, 14, y); y += 7; });
 
   y += 2;
@@ -1362,13 +1460,19 @@ function generateFullTermPdf(trip, user) {
   if (y > 230) { doc.addPage(); y = 18; }
   y += 4;
   doc.setFont('helvetica', 'bold');
-  doc.text('CLAUSULAS LEGAIS', 14, y); y += 7;
+  doc.text('DECLARAÇÃO', 14, y); y += 7;
   doc.setFont('helvetica', 'normal');
+  
+  const declaracao = `A empresa ${company.name} de CNPJ ${company.cnpj} declara que o(a) colaborador(a) ${user?.name || '-'} CPF ${user?.cpf || 'Não informado'} realizou a prestação de contas referente à viagem a ${trip.serviceLocation} no período de ${fmtDate(trip.startDate)} a ${fmtDate(trip.endDate)}, estando os valores e comprovantes devidamente analisados e aprovados pelo setor financeiro.`;
+  const declaracaoLines = doc.splitTextToSize(declaracao, 180);
+  doc.text(declaracaoLines, 14, y);
+  y += declaracaoLines.length * 6 + 4;
+
   const clauses = [
-    'O usuario declara que as informacoes e comprovantes inseridos neste termo correspondem integralmente as despesas da viagem.',
-    'O usuario devera realizar o acerto com o setor financeiro em ate 3 dias uteis, devolvendo eventual saldo ou recebendo eventual diferenca apurada.',
-    'Este termo e seus comprovantes deverao permanecer armazenados por no minimo 30 dias apos a assinatura eletronica de ambas as partes.',
-    'A assinatura eletronica abaixo confirma a concordancia com as normas internas da empresa e com a analise final do setor financeiro.'
+    'O(A) usuário(a) declara que as informações e comprovantes inseridos neste termo correspondem integralmente às despesas da viagem.',
+    'O(A) usuário(a) deverá realizar o acerto com o setor financeiro em até 3 dias úteis, devolvendo eventual saldo ou recebendo eventual diferença apurada.',
+    'Este termo e seus comprovantes deverão permanecer armazenados por no mínimo 30 dias após a assinatura eletrônica de ambas as partes.',
+    'A assinatura eletrônica abaixo confirma a concordância com as normas internas da empresa e com a análise final do setor financeiro.'
   ];
   clauses.forEach(paragraph => {
     const lines = doc.splitTextToSize(paragraph, 180);
@@ -1380,13 +1484,18 @@ function generateFullTermPdf(trip, user) {
   if (y > 240) { doc.addPage(); y = 18; }
   y += 8;
   doc.setFont('helvetica', 'bold');
-  doc.text('ASSINATURA DO USUARIO', 14, y); y += 8;
+  doc.text('ASSINATURA DO(A) COLABORADOR(A)', 14, y); y += 8;
   if (trip.userSignature) {
     try { doc.addImage(trip.userSignature, 'PNG', 14, y, 70, 28); } catch (e) {}
   }
   y += 36;
   doc.setFont('helvetica', 'normal');
   doc.text(`Assinado eletronicamente em: ${fmtDate(trip.userSignatureDate || todayISO())}`, 14, y);
+  y += 10;
+  
+  doc.setFont('helvetica', 'italic');
+  doc.setFontSize(9);
+  doc.text(`São Sebastião do Caí, ${dataExtenso}`, 14, y);
 
   return doc;
 }
@@ -1396,21 +1505,25 @@ function generateCompleteFinalPdf(trip, user) {
   const doc = new jsPDF();
   let y = 18;
   const saldo = settlementAmount(trip);
+  const company = getCompanyByTrip(trip);
+  const dataExtenso = formatDateExtended();
+  const financeiroUser = currentUser();
 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(18);
-  doc.text('DeltaSoft - PRESTACAO FINAL DE VIAGEM', 14, y);
+  doc.text('DeltaSoft - PRESTAÇÃO FINAL DE VIAGEM', 14, y);
   y += 10;
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(11);
   [
     tripLabel(trip),
-    `${getRoleLabel(user?.role)}: ${user?.name || '-'}`,
-    `Empresa: ${trip.company}`,
-    `Periodo: ${fmtDate(trip.startDate)} ate ${fmtDate(trip.endDate)}`,
-    `Local do servico: ${trip.serviceLocation}`,
-    `Prazo de guarda do termo: 30 dias apos a assinatura das duas partes`
+    `Colaborador(a): ${user?.name || '-'} • CPF: ${user?.cpf || 'Não informado'}`,
+    `Financeiro(a): ${financeiroUser?.name || '-'} • CPF: ${financeiroUser?.cpf || 'Não informado'}`,
+    `Empresa: ${company.name} • CNPJ: ${company.cnpj}`,
+    `Período: ${fmtDate(trip.startDate)} até ${fmtDate(trip.endDate)}`,
+    `Local do serviço: ${trip.serviceLocation}`,
+    `Prazo de guarda do termo: 30 dias após a assinatura das duas partes`
   ].forEach(line => { doc.text(line, 14, y); y += 7; });
 
   y += 3;
@@ -1419,12 +1532,14 @@ function generateCompleteFinalPdf(trip, user) {
   doc.setFont('helvetica', 'normal');
   [
     `Valor previsto: ${money(trip.plannedAmount)}`,
-    `Valor liberado em cartao: ${money(trip.cardAmount || 0)}`,
+    `Forma de liberação: ${trip.paymentTypeLabel || '-'}`,
+    `Valor liberado em cartão: ${money(trip.cardAmount || 0)}`,
     `Valor liberado em dinheiro: ${money(trip.cashAmount || 0)}`,
+    `Total liberado ao(à) colaborador(a): ${money(Number(trip.cardAmount || 0) + Number(trip.cashAmount || 0))}`,
     `Extras aprovados: ${money((trip.extraFunds || []).filter(x => x.status === 'aprovado').reduce((a, b) => a + Number(b.totalAmount || 0), 0))}`,
     `Total de recursos: ${money(totalApprovedResources(trip))}`,
     `Total de gastos: ${money(tripTotal(trip))}`,
-    `${saldo >= 0 ? 'Valor a devolver pelo usuario' : 'Valor a receber de volta pelo usuario'}: ${money(Math.abs(saldo))}`
+    `${saldo >= 0 ? 'Valor a devolver pelo(a) usuário(a)' : 'Valor a receber de volta pelo(a) usuário(a)'}: ${money(Math.abs(saldo))}`
   ].forEach(line => { doc.text(line, 14, y); y += 7; });
 
   y += 2;
@@ -1456,12 +1571,18 @@ function generateCompleteFinalPdf(trip, user) {
   if (y > 225) { doc.addPage(); y = 18; }
   y += 4;
   doc.setFont('helvetica', 'bold');
-  doc.text('CLAUSULAS LEGAIS', 14, y); y += 7;
+  doc.text('DECLARAÇÃO', 14, y); y += 7;
   doc.setFont('helvetica', 'normal');
+  
+  const declaracao = `A empresa ${company.name} de CNPJ ${company.cnpj} declara que o(a) colaborador(a) ${user?.name || '-'} CPF ${user?.cpf || 'Não informado'} finalizou a prestação de contas da viagem a ${trip.serviceLocation} no período de ${fmtDate(trip.startDate)} a ${fmtDate(trip.endDate)}, estando todas as despesas devidamente comprovadas e aprovadas.`;
+  const declaracaoLines = doc.splitTextToSize(declaracao, 180);
+  doc.text(declaracaoLines, 14, y);
+  y += declaracaoLines.length * 6 + 4;
+
   const clauses = [
-    'O usuario e o setor financeiro declaram que analisaram os valores, comprovantes e calculos desta viagem.',
-    'O presente termo permanece disponivel no sistema e deve ser armazenado por no minimo 30 dias apos a assinatura eletronicade ambas as partes.',
-    'O encerramento desta viagem somente ocorre apos a assinatura do usuario e do financeiro neste documento final.'
+    'O(A) usuário(a) e o(a) financeiro(a) declaram que analisaram os valores, comprovantes e cálculos desta viagem.',
+    'O presente termo permanece disponível no sistema e deve ser armazenado por no mínimo 30 dias após a assinatura eletrônica de ambas as partes.',
+    'O encerramento desta viagem somente ocorre após a assinatura do(a) usuário(a) e do(a) financeiro(a) neste documento final.'
   ];
   clauses.forEach(paragraph => {
     const lines = doc.splitTextToSize(paragraph, 180);
@@ -1473,110 +1594,140 @@ function generateCompleteFinalPdf(trip, user) {
   if (y > 220) { doc.addPage(); y = 18; }
   y += 8;
   doc.setFont('helvetica', 'bold');
-  doc.text('ASSINATURAS ELETRONICAS', 14, y); y += 8;
-  try { if (trip.userSignature) doc.addImage(trip.userSignature, 'PNG', 14, y, 70, 26); } catch (e) {}
-  try { if (trip.financeSignature) doc.addImage(trip.financeSignature, 'PNG', 110, y, 70, 26); } catch (e) {}
-  y += 32;
+  doc.text('ASSINATURAS ELETRÔNICAS', 14, y); y += 8;
   doc.setFont('helvetica', 'normal');
-  doc.text('Usuario', 14, y);
-  doc.text('Financeiro', 110, y);
-  y += 6;
-  doc.text(`Data usuario: ${fmtDate(trip.userSignatureDate || todayISO())}`, 14, y);
-  doc.text(`Data financeiro: ${fmtDate(trip.financeSignatureDate || todayISO())}`, 110, y);
+  try { if (trip.userSignature) doc.addImage(trip.userSignature, 'PNG', 14, y, 70, 26); } catch (e) {}
+  doc.text('Assinatura do(a) colaborador(a)', 14, y + 30);
+  try { if (trip.financeSignature) doc.addImage(trip.financeSignature, 'PNG', 110, y, 70, 26); } catch (e) {}
+  doc.text('Assinatura do(a) financeiro(a)', 110, y + 30);
+  y += 55;
+  doc.setFont('helvetica', 'italic');
+  doc.setFontSize(9);
+  doc.text(`São Sebastião do Caí, ${dataExtenso}`, 14, y);
 
   return doc;
 }
 
 function buildFullTermSnapshot(trip, user, financeNotes) {
   const saldo = settlementAmount(trip);
+  const company = getCompanyByTrip(trip);
+  const financeiroUser = currentUser();
   return `<div class="pdf-head"><div><h2>Termo Final de Prestação de Contas</h2><p>${tripLabel(trip)}</p></div><div>${fmtDate(todayISO())}</div></div>
   <div class="pdf-block">
-    <p><strong>${getRoleLabel(user?.role)}:</strong> ${user?.name || '-'}</p>
-    <p><strong>Empresa:</strong> ${trip.company}</p>
+    <p><strong>Colaborador(a):</strong> ${user?.name || '-'} • CPF: ${user?.cpf || 'Não informado'}</p>
+    <p><strong>Financeiro(a):</strong> ${financeiroUser?.name || '-'} • CPF: ${financeiroUser?.cpf || 'Não informado'}</p>
+    <p><strong>Empresa:</strong> ${company.name} • CNPJ: ${company.cnpj}</p>
     <p><strong>Período:</strong> ${fmtDate(trip.startDate)} até ${fmtDate(trip.endDate)}</p>
     <p><strong>Local do serviço:</strong> ${trip.serviceLocation}</p>
     <p><strong>Prazo para acerto com o financeiro:</strong> ${trip.accountabilityDeadline ? fmtDate(trip.accountabilityDeadline) : '-'} (3 dias úteis)</p>
   </div>
   <div class="pdf-block">
     <p><strong>Valor previsto:</strong> ${money(trip.plannedAmount)}</p>
+    <p><strong>Forma de liberação:</strong> ${trip.paymentTypeLabel || '-'}</p>
     <p><strong>Valor liberado em cartão:</strong> ${money(trip.cardAmount || 0)}</p>
     <p><strong>Valor liberado em dinheiro:</strong> ${money(trip.cashAmount || 0)}</p>
+    <p><strong>Total liberado ao(à) colaborador(a):</strong> ${money(Number(trip.cardAmount || 0) + Number(trip.cashAmount || 0))}</p>
     <p><strong>Extras aprovados:</strong> ${money((trip.extraFunds || []).filter(x => x.status === 'aprovado').reduce((a, b) => a + Number(b.totalAmount || 0), 0))}</p>
     <p><strong>Total de recursos disponibilizados:</strong> ${money(totalApprovedResources(trip))}</p>
     <p><strong>Total de gastos lançados:</strong> ${money(tripTotal(trip))}</p>
-    <p><strong>${saldo >= 0 ? 'Valor a devolver pelo usuário' : 'Valor a receber de volta pelo usuário'}:</strong> ${money(Math.abs(saldo))}</p>
+    <p><strong>${saldo >= 0 ? 'Valor a devolver pelo(a) usuário(a)' : 'Valor a receber de volta pelo(a) usuário(a)'}:</strong> ${money(Math.abs(saldo))}</p>
   </div>
   <div class="pdf-block">
     <p><strong>Detalhamento dos gastos e comprovantes:</strong></p>
     ${(trip.expenses || []).length ? (trip.expenses || []).map((exp, index) => `<div class="pdf-proof" style="align-items:flex-start;"><div style="min-width:34px;"><strong>${index + 1}.</strong></div><div style="flex:1;"><strong>${exp.description}</strong><br>Data: ${fmtDate(exp.date)}<br>Valor: ${money(exp.amount)}<br>Forma de pagamento: ${exp.method}<br>Comprovante: ${exp.receiptName || 'Anexado'}${exp.receiptPreview ? `<div style="margin-top:10px;"><img src="${exp.receiptPreview}" alt="${exp.receiptName || 'Comprovante'}" style="width:100%;max-width:360px;border-radius:12px;border:1px solid #d7e4f3;object-fit:contain"></div>` : ''}</div></div>`).join('') : `<div class="small">Nenhum gasto registrado.</div>`}
   </div>
   <div class="legal-notice" style="margin-top:16px;">
-    <strong>CLÁUSULAS LEGAIS E RESPONSABILIDADE</strong>
-    <p>O usuário declara que todos os gastos informados se referem exclusivamente à viagem corporativa e que os comprovantes apresentados são verdadeiros e idôneos.</p>
-    <p>O usuário reconhece que deverá realizar o acerto com o setor financeiro em até 3 (três) dias úteis após o encerramento da viagem, devolvendo eventual saldo remanescente ou recebendo eventual diferença apurada.</p>
+    <strong>DECLARAÇÃO</strong>
+    <p>A empresa ${company.name} de CNPJ ${company.cnpj} declara que o(a) colaborador(a) ${user?.name || '-'} CPF ${user?.cpf || 'Não informado'} realizou a prestação de contas referente à viagem a ${trip.serviceLocation} no período de ${fmtDate(trip.startDate)} a ${fmtDate(trip.endDate)}, estando os valores e comprovantes devidamente analisados e aprovados pelo setor financeiro.</p>
+    <p>O(A) usuário(a) declara que todas as despesas lançadas nesta viagem são legítimas, ocorreram durante o período da viagem e estão devidamente comprovadas com recibos e notas fiscais anexadas.</p>
+    <p>O(A) usuário(a) reconhece que deverá realizar o acerto com o setor financeiro em até 3 (três) dias úteis após o encerramento da viagem, devolvendo eventual saldo remanescente ou recebendo eventual diferença apurada.</p>
     <p>Este termo, juntamente com seus comprovantes, deverá permanecer armazenado por no mínimo 30 (trinta) dias após a assinatura eletrônica de ambas as partes.</p>
-    <p>A assinatura eletrônica do usuário confirma a veracidade das informações lançadas e autoriza a análise final pelo setor financeiro.</p>
+    <p>A assinatura eletrônica do(a) usuário(a) confirma a veracidade das informações lançadas e autoriza a análise final pelo setor financeiro.</p>
     ${financeNotes ? `<p><strong>Observação do financeiro:</strong> ${financeNotes}</p>` : ''}
+  </div>
+  <div class="pdf-block" style="margin-top:16px;">
+    <p><strong>ASSINATURA DO(A) COLABORADOR(A)</strong></p>
+    ${trip.userSignature ? `<p><strong>Assinado eletronicamente em: ${fmtDate(trip.userSignatureDate || todayISO())}</strong></p>` : '<p><em>Aguardando assinatura do(a) colaborador(a)</em></p>'}
+  </div>
+  <div class="pdf-block" style="margin-top:16px; font-style: italic; font-size: 0.85rem;">
+    <p>São Sebastião do Caí, ${formatDateExtended()}</p>
   </div>`;
 }
 
 function buildCompleteFinalSnapshot(trip, user) {
   const saldo = settlementAmount(trip);
+  const company = getCompanyByTrip(trip);
+  const financeiroUser = currentUser();
   return `<div class="pdf-head"><div><h2>Prestação Final de Viagem</h2><p>${tripLabel(trip)}</p></div><div>${fmtDate(todayISO())}</div></div>
   <div class="pdf-block">
-    <p><strong>${getRoleLabel(user?.role)}:</strong> ${user?.name || '-'}</p>
-    <p><strong>Empresa:</strong> ${trip.company}</p>
+    <p><strong>Colaborador(a):</strong> ${user?.name || '-'} • CPF: ${user?.cpf || 'Não informado'}</p>
+    <p><strong>Financeiro(a):</strong> ${financeiroUser?.name || '-'} • CPF: ${financeiroUser?.cpf || 'Não informado'}</p>
+    <p><strong>Empresa:</strong> ${company.name} • CNPJ: ${company.cnpj}</p>
     <p><strong>Período:</strong> ${fmtDate(trip.startDate)} até ${fmtDate(trip.endDate)}</p>
     <p><strong>Local do serviço:</strong> ${trip.serviceLocation}</p>
   </div>
   <div class="pdf-block">
     <p><strong>Previsto:</strong> ${money(trip.plannedAmount)}</p>
-    <p><strong>Recursos liberados:</strong> ${money(totalApprovedResources(trip))}</p>
+    <p><strong>Forma de liberação:</strong> ${trip.paymentTypeLabel || '-'}</p>
+    <p><strong>Valor liberado em cartão:</strong> ${money(trip.cardAmount || 0)}</p>
+    <p><strong>Valor liberado em dinheiro:</strong> ${money(trip.cashAmount || 0)}</p>
+    <p><strong>Total liberado ao(à) colaborador(a):</strong> ${money(Number(trip.cardAmount || 0) + Number(trip.cashAmount || 0))}</p>
+    <p><strong>Recursos totais:</strong> ${money(totalApprovedResources(trip))}</p>
     <p><strong>Gastos lançados:</strong> ${money(tripTotal(trip))}</p>
     <p><strong>${saldo >= 0 ? 'Valor a devolver' : 'Valor a receber de volta'}:</strong> ${money(Math.abs(saldo))}</p>
   </div>
   <div class="pdf-block">
+    <p><strong>DECLARAÇÃO</strong></p>
+    <p>A empresa ${company.name} de CNPJ ${company.cnpj} declara que o(a) colaborador(a) ${user?.name || '-'} CPF ${user?.cpf || 'Não informado'} finalizou a prestação de contas da viagem a ${trip.serviceLocation} no período de ${fmtDate(trip.startDate)} a ${fmtDate(trip.endDate)}, estando todas as despesas devidamente comprovadas e aprovadas.</p>
     <p><strong>Prazo mínimo de guarda:</strong> 30 dias após a assinatura das duas partes.</p>
   </div>
   <div class="signature-preview" style="margin-top: 16px;">
-    <p><strong>Assinatura do usuário:</strong></p>
-    <img src="${trip.userSignature}" style="max-width: 200px;">
-    <p><strong>Assinatura do financeiro:</strong></p>
-    <img src="${trip.financeSignature}" style="max-width: 200px;">
+    <p><strong>Assinatura do(a) colaborador(a):</strong></p>
+    <img src="${trip.userSignature}" style="max-width: 200px; border: 1px solid #ccc; border-radius: 8px;">
+    <p><strong>Assinatura do(a) financeiro(a):</strong></p>
+    <img src="${trip.financeSignature}" style="max-width: 200px; border: 1px solid #ccc; border-radius: 8px;">
+  </div>
+  <div class="pdf-block" style="margin-top:16px; font-style: italic; font-size: 0.85rem;">
+    <p>São Sebastião do Caí, ${formatDateExtended()}</p>
   </div>`;
 }
 
 function buildReleaseTermSnapshot(trip, user) {
+  const company = getCompanyByTrip(trip);
+  const financeiroUser = currentUser();
   return `<div class="pdf-head"><div><h2>Termo de Liberação de Viagem</h2><p>${tripLabel(trip)}</p></div><div>${fmtDate(trip.releaseTermGeneratedAt || todayISO())}</div></div>
   <div class="pdf-block">
-    <p><strong>Colaborador:</strong> ${user?.name || '-'}</p>
-    <p><strong>Perfil:</strong> ${getRoleLabel(user?.role)}</p>
-    <p><strong>Empresa:</strong> ${trip.company}</p>
+    <p><strong>Colaborador(a):</strong> ${user?.name || '-'} • CPF: ${user?.cpf || 'Não informado'}</p>
+    <p><strong>Financeiro(a):</strong> ${financeiroUser?.name || '-'} • CPF: ${financeiroUser?.cpf || 'Não informado'}</p>
+    <p><strong>Empresa:</strong> ${company.name} • CNPJ: ${company.cnpj}</p>
     <p><strong>Período da viagem:</strong> ${fmtDate(trip.startDate)} até ${fmtDate(trip.endDate)}</p>
-    <p><strong>Local de prestação do serviço:</strong> ${trip.serviceLocation}</p>
+    <p><strong>Local do serviço:</strong> ${trip.serviceLocation}</p>
   </div>
   <div class="pdf-block">
     <p><strong>Valor previsto solicitado:</strong> ${money(trip.plannedAmount)}</p>
     <p><strong>Forma de liberação:</strong> ${trip.paymentTypeLabel || '-'}</p>
     <p><strong>Valor liberado em cartão:</strong> ${money(trip.cardAmount || 0)}</p>
     <p><strong>Valor liberado em dinheiro:</strong> ${money(trip.cashAmount || 0)}</p>
-    <p><strong>Total efetivamente entregue/liberado ao usuário:</strong> ${money(Number(trip.cardAmount || 0) + Number(trip.cashAmount || 0))}</p>
+    <p><strong>Total liberado ao(à) colaborador(a):</strong> ${money(Number(trip.cardAmount || 0) + Number(trip.cashAmount || 0))}</p>
   </div>
   <div class="legal-notice" style="margin-top:16px;">
     <strong>DECLARAÇÃO DE ENTREGA E RESPONSABILIDADE</strong>
-    <p>O setor financeiro declara, para todos os fins internos e externos cabíveis, que os valores acima foram liberados ao colaborador para custeio exclusivo da viagem corporativa indicada neste documento, seja por cartão corporativo, por dinheiro em espécie, ou por ambos.</p>
-    <p>O colaborador declara que recebeu os valores informados, compromete-se a utilizá-los exclusivamente em despesas relacionadas à viagem e reconhece a obrigação de apresentar prestação de contas completa, com comprovantes válidos, dentro do prazo definido pela empresa.</p>
-    <p>Este termo deverá ser assinado por ambas as partes. Após as assinaturas, o financeiro deverá tirar uma foto legível e em boa resolução do documento assinado e anexá-la ao sistema. Somente após esse anexo a viagem poderá ser liberada.</p>
+    <p>A empresa ${company.name} de CNPJ ${company.cnpj} declara que os valores acima foram liberados ao(à) colaborador(a) ${user?.name || '-'} CPF ${user?.cpf || 'Não informado'} para custeio exclusivo da viagem corporativa indicada neste documento, seja por cartão corporativo, por dinheiro em espécie, ou por ambos.</p>
+    <p>O(A) colaborador(a) declara que recebeu os valores informados, compromete-se a utilizá-los exclusivamente em despesas relacionadas à viagem e reconhece a obrigação de apresentar prestação de contas completa, com comprovantes válidos, dentro do prazo definido pela empresa.</p>
+    <p>Este termo deverá ser assinado por ambas as partes. Após as assinaturas, o financeiro deverá digitalizar o documento assinado e anexá-lo ao sistema. Somente após esse anexo a viagem poderá ser liberada.</p>
     <p>Em caso de perda do documento físico, este termo permanecerá disponível para visualização e download no sistema.</p>
   </div>
   <div class="pdf-block">
     <p><strong>Assinaturas obrigatórias no documento físico:</strong></p>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:14px;">
-      <div style="padding-top:26px;border-top:1px solid #8ba7c7;">Assinatura do colaborador</div>
-      <div style="padding-top:26px;border-top:1px solid #8ba7c7;">Assinatura do financeiro</div>
+    <div class="sign-grid">
+      <div class="sign-box">Assinatura do(a) colaborador(a)</div>
+      <div class="sign-box">Assinatura do(a) financeiro(a)</div>
     </div>
   </div>
-  ${imagePreviewHtml(trip.releaseTermPhotoFile?.data)}`;
+  ${imagePreviewHtml(trip.releaseTermPhotoFile?.data, trip.releaseTermPhotoFile?.name || 'Documento anexado')}
+  <div class="pdf-block" style="margin-top:16px; font-style: italic; font-size: 0.85rem;">
+    <p>São Sebastião do Caí, ${formatDateExtended()}</p>
+  </div>`;
 }
 
 function openReleaseTermPreview(id) {
@@ -1584,8 +1735,8 @@ function openReleaseTermPreview(id) {
   if (!trip) return;
   const user = state.users.find(u => u.id === trip.userId);
   const downloadBtn = trip.releaseTermGeneratedFile ? `<a class="btn btn-secondary" href="${trip.releaseTermGeneratedFile.data}" download="${trip.releaseTermGeneratedFile.name}">Baixar PDF</a>` : '';
-  const photoBtn = trip.releaseTermPhotoFile ? `<a class="btn btn-ghost" href="${trip.releaseTermPhotoFile.data}" download="${trip.releaseTermPhotoFile.name}">Baixar foto</a>` : '';
-  modal('Visualização do termo de liberação', `<div class="pdf-preview">${buildReleaseTermSnapshot(trip, user)}</div><div class="actions" style="margin-top:16px;">${downloadBtn}${photoBtn}</div>`);
+  const docBtn = trip.releaseTermPhotoFile ? `<a class="btn btn-ghost" href="${trip.releaseTermPhotoFile.data}" download="${trip.releaseTermPhotoFile.name}">Baixar documento anexado</a>` : '';
+  modal('Visualização do termo de liberação', `<div class="pdf-preview">${buildReleaseTermSnapshot(trip, user)}</div><div class="actions" style="margin-top:16px;">${downloadBtn}${docBtn}</div>`);
 }
 window.openReleaseTermPreview = openReleaseTermPreview;
 
@@ -1593,37 +1744,44 @@ function generateReleaseDeliveryPdf(trip, user) {
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF();
   let y = 18;
+  const company = getCompanyByTrip(trip);
+  const dataExtenso = formatDateExtended();
+  const financeiroUser = currentUser();
 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(17);
-  doc.text('DeltaSoft - TERMO DE LIBERACAO DE VIAGEM', 14, y);
+  doc.text('DeltaSoft - TERMO DE LIBERAÇÃO DE VIAGEM', 14, y);
   y += 10;
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(11);
   [
     `${tripLabel(trip)}`,
-    `Colaborador: ${user?.name || '-'}`,
-    `Perfil: ${getRoleLabel(user?.role)}`,
-    `Empresa: ${trip.company}`,
-    `Periodo: ${fmtDate(trip.startDate)} ate ${fmtDate(trip.endDate)}`,
-    `Local do servico: ${trip.serviceLocation}`,
-    `Forma de liberacao: ${trip.paymentTypeLabel || '-'}`,
-    `Valor liberado em cartao: ${money(trip.cardAmount || 0)}`,
+    `Colaborador(a): ${user?.name || '-'} • CPF: ${user?.cpf || 'Não informado'}`,
+    `Financeiro(a): ${financeiroUser?.name || '-'} • CPF: ${financeiroUser?.cpf || 'Não informado'}`,
+    `Empresa: ${company.name} • CNPJ: ${company.cnpj}`,
+    `Período: ${fmtDate(trip.startDate)} até ${fmtDate(trip.endDate)}`,
+    `Local do serviço: ${trip.serviceLocation}`,
+    `Forma de liberação: ${trip.paymentTypeLabel || '-'}`,
+    `Valor liberado em cartão: ${money(trip.cardAmount || 0)}`,
     `Valor liberado em dinheiro: ${money(trip.cashAmount || 0)}`,
-    `Total liberado ao usuario: ${money(Number(trip.cardAmount || 0) + Number(trip.cashAmount || 0))}`
+    `Total liberado ao(à) colaborador(a): ${money(Number(trip.cardAmount || 0) + Number(trip.cashAmount || 0))}`
   ].forEach(line => { doc.text(line, 14, y); y += 7; });
 
   y += 4;
   doc.setFont('helvetica', 'bold');
-  doc.text('DECLARACAO DE ENTREGA E RESPONSABILIDADE', 14, y); y += 8;
+  doc.text('DECLARAÇÃO DE ENTREGA E RESPONSABILIDADE', 14, y); y += 8;
   doc.setFont('helvetica', 'normal');
 
+  const declaracao = `A empresa ${company.name} de CNPJ ${company.cnpj} declara que os valores acima foram liberados ao(à) colaborador(a) ${user?.name || '-'} CPF ${user?.cpf || 'Não informado'} para custeio exclusivo da viagem corporativa identificada neste documento.`;
+  const declaracaoLines = doc.splitTextToSize(declaracao, 180);
+  doc.text(declaracaoLines, 14, y);
+  y += declaracaoLines.length * 6 + 4;
+
   const paragraphs = [
-    'O setor financeiro declara que os valores acima foram liberados ao colaborador para custeio exclusivo da viagem corporativa identificada neste documento.',
-    'O colaborador declara que recebeu os valores informados e se compromete a utiliza-los exclusivamente em despesas relacionadas a viagem, apresentando a prestacao de contas com comprovantes validos dentro do prazo interno da empresa.',
-    'Este termo devera ser assinado por ambas as partes. Apos as assinaturas, o financeiro devera tirar uma foto legivel e em boa resolucao do documento assinado e anexa-la ao sistema. Somente apos esse anexo a viagem podera ser liberada.',
-    'Em caso de perda do documento fisico, este termo permanecera disponivel para visualizacao e download no sistema.'
+    'O(A) colaborador(a) declara que recebeu os valores informados e se compromete a utilizá-los exclusivamente em despesas relacionadas à viagem, apresentando a prestação de contas com comprovantes válidos dentro do prazo interno da empresa.',
+    'Este termo deverá ser assinado por ambas as partes. Após as assinaturas, o financeiro deverá digitalizar o documento assinado e anexá-lo ao sistema. Somente após esse anexo a viagem poderá ser liberada.',
+    'Em caso de perda do documento físico, este termo permanecerá disponível para visualização e download no sistema.'
   ];
 
   paragraphs.forEach(paragraph => {
@@ -1638,19 +1796,18 @@ function generateReleaseDeliveryPdf(trip, user) {
   doc.line(20, y, 85, y);
   doc.line(120, y, 185, y);
   y += 7;
-  doc.text('Assinatura do colaborador', 23, y);
-  doc.text('Assinatura do financeiro', 123, y);
+  doc.text('Assinatura do(a) colaborador(a)', 23, y);
+  doc.text('Assinatura do(a) financeiro(a)', 123, y);
+  y += 20;
+  doc.setFont('helvetica', 'italic');
+  doc.setFontSize(9);
+  doc.text(`São Sebastião do Caí, ${dataExtenso}`, 14, y);
 
   return doc;
 }
 
-function addDaysISO(dateStr, days) {
-  const d = parseDate(dateStr);
-  d.setDate(d.getDate() + days);
-  return d.toISOString().split('T')[0];
-}
-
 function addBusinessDaysISO(dateStr, days) {
+  if (!dateStr) return todayISO();
   const d = parseDate(dateStr);
   let remaining = Number(days || 0);
   while (remaining > 0) {
@@ -1671,11 +1828,12 @@ function blobToDataURL(blob) {
 }
 
 function resetTestData() {
-  if (!confirm('Deseja limpar os dados de teste?')) return;
+  if (!confirm('Deseja limpar os dados de teste? Esta ação não pode ser desfeita.')) return;
   state = structuredClone(defaultData);
   saveData();
   currentView = 'dashboard';
   renderApp();
+  alert('Dados restaurados para o padrão inicial.');
 }
 window.resetTestData = resetTestData;
 
