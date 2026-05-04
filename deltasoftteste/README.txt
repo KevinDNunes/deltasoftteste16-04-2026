@@ -19,6 +19,7 @@ FUNCIONALIDADES IMPLEMENTADAS:
 ✅ Assinatura eletrônica: Usuário e financeiro assinam digitalmente
 ✅ Gastos obrigatórios: Todos os campos devem ser preenchidos (comprovante obrigatório)
 ✅ Sem campo de observações: Removido conforme solicitado
+✅ Recusa com justificativa: Financeiro deve informar motivo ao recusar viagem
 
 TECNOLOGIAS UTILIZADAS:
 - HTML5, CSS3, JavaScript

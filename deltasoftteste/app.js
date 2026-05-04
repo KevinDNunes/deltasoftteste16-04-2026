@@ -919,12 +919,43 @@ window.submitApproval = submitApproval;
 function rejectTrip(id) {
   const trip = state.trips.find(t => t.id === id);
   if (!trip) return;
-  if (trip.cardInUse) trip.cardInUse = false;
-  trip.status = 'recusada';
-  saveData();
-  renderApp();
+  
+  modal('Recusar solicitação de viagem', `
+    <form class="form" onsubmit="submitRejectTrip(event, ${id})">
+      <label>
+        Motivo da recusa
+        <textarea id="rejectionReason" required placeholder="Explique o motivo pelo qual esta viagem está sendo recusada..."></textarea>
+      </label>
+      <div class="note" style="margin-top: 8px;">
+        ⚠️ O usuário receberá esta explicação como justificativa da recusa.
+      </div>
+      <button class="btn btn-danger btn-lg" type="submit">Confirmar recusa</button>
+    </form>
+  `);
 }
 window.rejectTrip = rejectTrip;
+
+function submitRejectTrip(ev, id) {
+  ev.preventDefault();
+  const trip = state.trips.find(t => t.id === id);
+  if (!trip) return;
+  
+  const rejectionReason = qs('#rejectionReason').value;
+  if (!rejectionReason.trim()) {
+    alert('Por favor, informe o motivo da recusa.');
+    return;
+  }
+  
+  if (trip.cardInUse) trip.cardInUse = false;
+  trip.status = 'recusada';
+  trip.rejectionReason = rejectionReason;
+  
+  saveData();
+  closeModal();
+  renderApp();
+  alert('Viagem recusada com sucesso!');
+}
+window.submitRejectTrip = submitRejectTrip;
 
 function openReleaseTermModal(id) {
   const trip = state.trips.find(t => t.id === id);
