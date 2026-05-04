@@ -201,6 +201,26 @@ function closeModal() {
 }
 window.closeModal = closeModal;
 
+function showRejectionReason(tripId) {
+  const trip = state.trips.find(t => t.id === tripId);
+  if (!trip || !trip.rejectionReason) {
+    alert('Nenhum motivo de recusa foi registrado para esta viagem.');
+    return;
+  }
+  
+  modal('Motivo da recusa', `
+    <div style="text-align: center;">
+      <div style="font-size: 4rem; margin-bottom: 16px;">📄</div>
+      <div class="legal-notice" style="background: #fff0f2; border-left-color: var(--danger);">
+        <strong>⚠️ Viagem Recusada</strong>
+        <p style="margin-top: 12px; white-space: pre-wrap;">${trip.rejectionReason}</p>
+      </div>
+      <button class="btn btn-primary" onclick="closeModal()">Entendi</button>
+    </div>
+  `);
+}
+window.showRejectionReason = showRejectionReason;
+
 function fileToData(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -405,9 +425,53 @@ function financeTripCard(t) {
   const canClose = t.status === 'aguardando_acerto';
   const canSignFinance = t.status === 'aguardando_assinatura_financeiro';
   const canApproveExtension = !!t.extensionRequestedUntil && t.extensionRequestedUntil !== t.extensionApprovedUntil;
+  const isRejected = t.status === 'recusada';
+  const isPendingCancellation = t.status === 'cancelamento_solicitado';
 
-  return `<div class="item-card"><div class="item-top"><div><h5 class="item-title">${u?.name || '-'} • CPF: ${u?.cpf || '-'} • ${t.company}</h5><p class="item-sub">${fmtDate(t.startDate)} até ${fmtDate(t.endDate)} • Serviço em ${t.serviceLocation}</p></div><div>${badge(t.status)}</div></div><div class="small">Previsto: ${money(t.plannedAmount)} • Recursos aprovados: ${money(totalApprovedResources(t))}</div><div class="small">Pagamento: ${t.paymentTypeLabel || 'Ainda não definido'} • Gasto lançado: ${money(tripTotal(t))}</div><div class="small">Termo de liberação: ${t.releaseTermGeneratedFile ? t.releaseTermGeneratedFile.name : 'Não gerado'}</div><div class="small">Documento do termo: ${t.releaseTermPhotoFile ? t.releaseTermPhotoFile.name : 'Não anexado'}</div>${pendingExtras.length ? `<div class="note">Pedido extra pendente: ${pendingExtras.map(x => money(x.totalAmount)).join(', ')}</div>` : ''}<div class="actions">${canApprove ? `<button class="btn btn-success" type="button" onclick="openApproveModal(${t.id}, 'cartao')">Aceitar com cartão</button><button class="btn btn-secondary" type="button" onclick="openApproveModal(${t.id}, 'dinheiro')">Aceitar com dinheiro</button><button class="btn btn-warning" type="button" onclick="openApproveModal(${t.id}, 'misto')">Aceitar misto</button><button class="btn btn-danger" type="button" onclick="rejectTrip(${t.id})">Recusar</button>` : ''}${t.releaseTermGeneratedFile ? `<button class="btn btn-secondary" type="button" onclick="openReleaseTermPreview(${t.id})">Ver termo</button><a class="btn btn-ghost" href="${t.releaseTermGeneratedFile.data}" download="${t.releaseTermGeneratedFile.name}">Baixar termo</a>` : ''}${canUploadRelease ? `<button class="btn btn-primary" type="button" onclick="openReleaseTermModal(${t.id})">Anexar termo assinado</button>` : ''}${canApproveExtension ? `<button class="btn btn-warning" type="button" onclick="approveExtension(${t.id})">Aprovar dias adicionais</button>` : ''}${pendingExtras.length ? `<button class="btn btn-secondary" type="button" onclick="openExtraFundsApprovalModal(${t.id})">Analisar pedido extra</button>` : ''}${canClose ? `<button class="btn btn-primary" type="button" onclick="viewPendingSignature(${t.id})">Ver termo e assinar</button>` : ''}${canSignFinance ? `<button class="btn btn-primary" type="button" onclick="openFinanceSignature(${t.id})">Assinar termo final</button>` : ''}</div></div>`;
+  return `<div class="item-card"><div class="item-top"><div><h5 class="item-title">${u?.name || '-'} • CPF: ${u?.cpf || '-'} • ${t.company}</h5><p class="item-sub">${fmtDate(t.startDate)} até ${fmtDate(t.endDate)} • Serviço em ${t.serviceLocation}</p></div><div style="display: flex; align-items: center; gap: 8px;">${badge(t.status)}${isRejected ? `<button class="btn btn-ghost" style="padding: 6px 10px;" onclick="showRejectionReason(${t.id})" title="Ver motivo da recusa">📄</button>` : ''}${isPendingCancellation ? `<button class="btn btn-ghost" style="padding: 6px 10px;" onclick="showCancellationReason(${t.id})" title="Ver motivo do cancelamento solicitado">📄</button>` : ''}</div></div><div class="small">Previsto: ${money(t.plannedAmount)} • Recursos aprovados: ${money(totalApprovedResources(t))}</div><div class="small">Pagamento: ${t.paymentTypeLabel || 'Ainda não definido'} • Gasto lançado: ${money(tripTotal(t))}</div><div class="small">Termo de liberação: ${t.releaseTermGeneratedFile ? t.releaseTermGeneratedFile.name : 'Não gerado'}</div><div class="small">Documento do termo: ${t.releaseTermPhotoFile ? t.releaseTermPhotoFile.name : 'Não anexado'}</div>${pendingExtras.length ? `<div class="note">Pedido extra pendente: ${pendingExtras.map(x => money(x.totalAmount)).join(', ')}</div>` : ''}${isPendingCancellation ? `<div class="legal-notice" style="margin: 12px 0;"><strong>📋 Pedido de cancelamento:</strong> ${t.cancellationReason || 'Motivo não informado'}<br><small>Solicitado em: ${fmtDate(t.cancellationRequestedAt)}</small></div><div class="actions"><button class="btn btn-success" type="button" onclick="approveCancellation(${t.id})">✅ Aprovar cancelamento</button><button class="btn btn-danger" type="button" onclick="rejectCancellation(${t.id})">❌ Recusar cancelamento</button></div>` : `<div class="actions">${canApprove ? `<button class="btn btn-success" type="button" onclick="openApproveModal(${t.id}, 'cartao')">Aceitar com cartão</button><button class="btn btn-secondary" type="button" onclick="openApproveModal(${t.id}, 'dinheiro')">Aceitar com dinheiro</button><button class="btn btn-warning" type="button" onclick="openApproveModal(${t.id}, 'misto')">Aceitar misto</button><button class="btn btn-danger" type="button" onclick="rejectTrip(${t.id})">Recusar</button>` : ''}${t.releaseTermGeneratedFile ? `<button class="btn btn-secondary" type="button" onclick="openReleaseTermPreview(${t.id})">Ver termo</button><a class="btn btn-ghost" href="${t.releaseTermGeneratedFile.data}" download="${t.releaseTermGeneratedFile.name}">Baixar termo</a>` : ''}${canUploadRelease ? `<button class="btn btn-primary" type="button" onclick="openReleaseTermModal(${t.id})">Anexar termo assinado</button>` : ''}${canApproveExtension ? `<button class="btn btn-warning" type="button" onclick="approveExtension(${t.id})">Aprovar dias adicionais</button>` : ''}${pendingExtras.length ? `<button class="btn btn-secondary" type="button" onclick="openExtraFundsApprovalModal(${t.id})">Analisar pedido extra</button>` : ''}${canClose ? `<button class="btn btn-primary" type="button" onclick="viewPendingSignature(${t.id})">Ver termo e assinar</button>` : ''}${canSignFinance ? `<button class="btn btn-primary" type="button" onclick="openFinanceSignature(${t.id})">Assinar termo final</button>` : ''}</div>`}</div>`;
 }
+
+function showCancellationReason(tripId) {
+  const trip = state.trips.find(t => t.id === tripId);
+  if (!trip) {
+    alert('Viagem não encontrada.');
+    return;
+  }
+  
+  let title = '';
+  let reason = '';
+  let extraInfo = '';
+  
+  if (trip.status === 'cancelamento_solicitado') {
+    title = '📋 Pedido de cancelamento - Aguardando aprovação';
+    reason = trip.cancellationReason || 'Motivo não informado';
+    extraInfo = `<p><strong>Solicitado em:</strong> ${fmtDate(trip.cancellationRequestedAt)}</p><p><strong>Status:</strong> Aguardando análise do financeiro</p>`;
+  } else if (trip.status === 'cancelada') {
+    title = '✅ Viagem cancelada';
+    reason = trip.cancellationReason || 'Motivo não informado';
+    extraInfo = `<p><strong>Solicitado em:</strong> ${fmtDate(trip.cancellationRequestedAt)}</p><p><strong>Aprovado em:</strong> ${fmtDate(trip.cancellationApprovedAt)}</p><p><strong>Aprovado por:</strong> ${trip.cancellationApprovedBy || 'Financeiro'}</p>`;
+  } else if (trip.cancellationRejectionReason) {
+    title = '❌ Pedido de cancelamento recusado';
+    reason = trip.cancellationReason || 'Motivo não informado';
+    extraInfo = `<p><strong>Motivo da recusa do financeiro:</strong> ${trip.cancellationRejectionReason}</p><p><strong>Recusado em:</strong> ${fmtDate(trip.cancellationRejectedAt)}</p>`;
+  } else {
+    alert('Nenhum motivo de cancelamento encontrado.');
+    return;
+  }
+  
+  modal(title, `
+    <div style="text-align: center;">
+      <div style="font-size: 4rem; margin-bottom: 16px;">📄</div>
+      <div class="legal-notice" style="${trip.status === 'cancelada' ? 'background: #e9fff6; border-left-color: var(--success);' : trip.status === 'cancelamento_solicitado' ? 'background: #fff8e6; border-left-color: var(--warning);' : 'background: #fff0f2; border-left-color: var(--danger);'}">
+        <strong>${title}</strong>
+        <p style="margin-top: 12px; white-space: pre-wrap;"><strong>Motivo informado pelo usuário:</strong><br>${reason}</p>
+        ${extraInfo}
+      </div>
+      <button class="btn btn-primary" onclick="closeModal()">Entendi</button>
+    </div>
+  `);
+}
+window.showCancellationReason = showCancellationReason;
 
 function renderFinanceDashboard() {
   const pend = state.trips.filter(t => t.status === 'pendente').length;
@@ -427,7 +491,7 @@ function renderFinanceRequests() {
 
 function renderCards() {
   const inUse = state.trips.filter(t => ['aprovada', 'em_andamento', 'aguardando_acerto', 'aguardando_assinatura_financeiro'].includes(t.status) && Number(t.cardAmount || 0) > 0 && t.cardInUse === true);
-  refs.dashboardView.innerHTML = `${sectionHead('Cartões corporativos', 'Cadastre os dados do cartão e acompanhe os cartões em uso.', `<button class="btn btn-primary" type="button" onclick="openCardModal()">+ Novo cartão</button>`)}<section class="grid two-col"><div class="panel"><h4>Cartões cadastrados</h4><div class="stack">${state.cards.length ? state.cards.map(c => `<div class="item-card"><div class="item-top"><div><h5 class="item-title">${c.company} • ${c.brand} • Final ${c.last4}</h5><p class="item-sub">Titular: ${c.holderName}</p></div><div class="pill-inline">${c.active ? 'Ativo' : 'Inativo'}</div></div><div class="small">Validade: ${c.expiry}</div><div class="small">Limite: ${money(c.limit)}</div></div>`).join('') : `<div class="empty">Nenhum cartão cadastrado ainda.</div>`}</div></div><div class="panel"><h4>Cartões em uso</h4><div class="stack">${inUse.length ? inUse.map(t => {
+  refs.dashboardView.innerHTML = `${sectionHead('Cartões corporativos', 'Cadastre os dados do cartão e acompanhe os cartões em uso.', `<button class="btn btn-primary" type="button" onclick="openCardModal()">+ Novo cartão</button>`)}<section class="grid two-col"><div class="panel"><h4>Cartões cadastrados</h4><div class="stack">${state.cards.length ? state.cards.map(c => `<div class="item-card"><div class="item-top"><div><h5 class="item-title">${c.company} • ${c.brand} • Final ${c.last4}</h5><p class="item-sub">Titular: ${c.holderName}</p></div><div class="pill-inline">${c.active ? 'Ativo' : 'Inativo'}</div></div><div class="small">Validade: ${c.expiry}</div><div class="small">Limite: ${money(c.limit)}</div><div class="actions"><button class="btn btn-secondary" type="button" onclick="editCard(${c.id})">✏️ Editar</button><button class="btn btn-danger" type="button" onclick="deleteCard(${c.id})">🗑️ Excluir</button></div></div>`).join('') : `<div class="empty">Nenhum cartão cadastrado ainda.</div>`}</div></div><div class="panel"><h4>Cartões em uso</h4><div class="stack">${inUse.length ? inUse.map(t => {
     const u = state.users.find(x => x.id === t.userId);
     return `<div class="item-card"><strong class="item-title">${u?.name || '-'} • CPF: ${u?.cpf || '-'} • ${t.company}</strong><p class="item-sub">${fmtDate(t.startDate)} até ${fmtDate(t.endDate)}</p><div class="small">Valor em cartão em uso: ${money(t.cardAmount || 0)}</div><div class="small">Status da viagem: ${t.status}</div></div>`;
   }).join('') : `<div class="empty">Nenhum cartão está sendo usado no momento.</div>`}</div></div></section>`;
@@ -443,7 +507,23 @@ function renderTechDashboard() {
 }
 
 function techTripCard(t, expanded = false) {
-  return `<div class="item-card"><div class="item-top"><div><h5 class="item-title">${t.company}</h5><p class="item-sub">${fmtDate(t.startDate)} até ${fmtDate(t.endDate)} • Serviço em ${t.serviceLocation}</p></div><div>${badge(t.status)}</div></div><div class="stack" style="margin-top:12px"><div class="note">Valor previsto: <strong>${money(t.plannedAmount)}</strong><br>Pagamento aprovado: <strong>${t.paymentTypeLabel || 'Aguardando aprovação'}</strong><br>Cartão: <strong>${money(t.cardAmount || 0)}</strong> • Dinheiro: <strong>${money(t.cashAmount || 0)}</strong><br>Termo de liberação: <strong>${t.releaseTermFile ? 'Anexado' : 'Pendente'}</strong><br>Prazo para acerto com o financeiro: <strong>${t.accountabilityDeadline ? fmtDate(t.accountabilityDeadline) : '-'}</strong> <span class="small">(3 dias úteis)</span><br>${settlementLabel(t)}<br>Dias adicionais aprovados até: <strong>${t.extensionApprovedUntil ? fmtDate(t.extensionApprovedUntil) : 'Sem dias adicionais'}</strong></div>${expanded ? `<div class="row"><div class="note">Recursos aprovados<br><strong>${money(totalApprovedResources(t))}</strong></div><div class="note">Gasto total<br><strong>${money(tripTotal(t))}</strong></div></div><div class="note">${settlementLabel(t)}</div>` : ''}</div></div>`;
+  const isRejected = t.status === 'recusada';
+  const isPendingCancellation = t.status === 'cancelamento_solicitado';
+  const isCancelled = t.status === 'cancelada';
+  const canRequestCancellation = ['aprovada', 'em_andamento'].includes(t.status);
+  
+  let statusBadge = badge(t.status);
+  let statusIcon = '';
+  
+  if (isPendingCancellation) {
+    statusIcon = `<button class="btn btn-ghost" style="padding: 6px 10px;" onclick="showCancellationReason(${t.id})" title="Ver motivo do cancelamento solicitado">📄</button>`;
+  } else if (isCancelled) {
+    statusIcon = `<button class="btn btn-ghost" style="padding: 6px 10px;" onclick="showCancellationReason(${t.id})" title="Ver motivo do cancelamento">📄</button>`;
+  } else if (isRejected) {
+    statusIcon = `<button class="btn btn-ghost" style="padding: 6px 10px;" onclick="showRejectionReason(${t.id})" title="Ver motivo da recusa">📄</button>`;
+  }
+  
+  return `<div class="item-card"><div class="item-top"><div><h5 class="item-title">${t.company}</h5><p class="item-sub">${fmtDate(t.startDate)} até ${fmtDate(t.endDate)} • Serviço em ${t.serviceLocation}</p></div><div style="display: flex; align-items: center; gap: 8px;">${statusBadge}${statusIcon}</div></div><div class="stack" style="margin-top:12px"><div class="note">Valor previsto: <strong>${money(t.plannedAmount)}</strong><br>Pagamento aprovado: <strong>${t.paymentTypeLabel || 'Aguardando aprovação'}</strong><br>Cartão: <strong>${money(t.cardAmount || 0)}</strong> • Dinheiro: <strong>${money(t.cashAmount || 0)}</strong><br>Termo de liberação: <strong>${t.releaseTermFile ? 'Anexado' : 'Pendente'}</strong><br>Prazo para acerto com o financeiro: <strong>${t.accountabilityDeadline ? fmtDate(t.accountabilityDeadline) : '-'}</strong> <span class="small">(3 dias úteis)</span><br>${settlementLabel(t)}<br>Dias adicionais aprovados até: <strong>${t.extensionApprovedUntil ? fmtDate(t.extensionApprovedUntil) : 'Sem dias adicionais'}</strong></div>${expanded ? `<div class="row"><div class="note">Recursos aprovados<br><strong>${money(totalApprovedResources(t))}</strong></div><div class="note">Gasto total<br><strong>${money(tripTotal(t))}</strong></div></div><div class="note">${settlementLabel(t)}</div>` : ''}<div class="actions">${canRequestCancellation ? `<button class="btn btn-danger" type="button" onclick="requestTripCancellation(${t.id})">❌ Cancelar viagem</button>` : ''}</div></div></div>`;
 }
 
 function renderMyTrips() {
@@ -524,7 +604,8 @@ function renderHistory() {
 
 function historyCard(t) {
   const u = state.users.find(x => x.id === t.userId);
-  return `<div class="item-card"><div class="item-top"><div><h5 class="item-title">${t.company}${!isTechLikeRole(currentUser().role) ? ` • ${u?.name || '-'} • CPF: ${u?.cpf || '-'}` : ''}</h5><p class="item-sub">${fmtDate(t.startDate)} até ${fmtDate(t.endDate)} • ${t.serviceLocation}</p></div><div>${badge(t.status)}</div></div><div class="small">Previsto: ${money(t.plannedAmount)} • Recursos: ${money(totalApprovedResources(t))} • Gastos: ${money(tripTotal(t))}</div><div class="small">Termo de liberação: ${t.releaseTermGeneratedFile ? t.releaseTermGeneratedFile.name : 'Não gerado'}</div><div class="small">Documento do termo: ${t.releaseTermPhotoFile ? t.releaseTermPhotoFile.name : 'Não anexado'}</div><div class="small">Termo final: ${t.finalTermFile ? t.finalTermFile.name : 'Não anexado'}</div><div class="small">PDF final: ${t.finalReportFile ? t.finalReportFile.name : 'Não gerado'}</div><div class="actions">${t.releaseTermGeneratedFile ? `<button class="btn btn-secondary" type="button" onclick="openReleaseTermPreview(${t.id})">Abrir termo</button>` : ''}${t.releaseTermGeneratedFile ? `<a class="btn btn-ghost" href="${t.releaseTermGeneratedFile.data}" download="${t.releaseTermGeneratedFile.name}">Baixar termo</a>` : ''}</div></div>`;
+  const isRejected = t.status === 'recusada';
+  return `<div class="item-card"><div class="item-top"><div><h5 class="item-title">${t.company}${!isTechLikeRole(currentUser().role) ? ` • ${u?.name || '-'} • CPF: ${u?.cpf || '-'}` : ''}</h5><p class="item-sub">${fmtDate(t.startDate)} até ${fmtDate(t.endDate)} • ${t.serviceLocation}</p></div><div style="display: flex; align-items: center; gap: 8px;">${badge(t.status)}${isRejected ? `<button class="btn btn-ghost" style="padding: 6px 10px;" onclick="showRejectionReason(${t.id})" title="Ver motivo da recusa">📄</button>` : ''}</div></div><div class="small">Previsto: ${money(t.plannedAmount)} • Recursos: ${money(totalApprovedResources(t))} • Gastos: ${money(tripTotal(t))}</div><div class="small">Termo de liberação: ${t.releaseTermGeneratedFile ? t.releaseTermGeneratedFile.name : 'Não gerado'}</div><div class="small">Documento do termo: ${t.releaseTermPhotoFile ? t.releaseTermPhotoFile.name : 'Não anexado'}</div><div class="small">Termo final: ${t.finalTermFile ? t.finalTermFile.name : 'Não anexado'}</div><div class="small">PDF final: ${t.finalReportFile ? t.finalReportFile.name : 'Não gerado'}</div><div class="actions">${t.releaseTermGeneratedFile ? `<button class="btn btn-secondary" type="button" onclick="openReleaseTermPreview(${t.id})">Abrir termo</button>` : ''}${t.releaseTermGeneratedFile ? `<a class="btn btn-ghost" href="${t.releaseTermGeneratedFile.data}" download="${t.releaseTermGeneratedFile.name}">Baixar termo</a>` : ''}</div></div>`;
 }
 
 function renderReports() {
@@ -680,6 +761,128 @@ function openCardModal() {
 }
 window.openCardModal = openCardModal;
 
+function editCard(cardId) {
+  const card = state.cards.find(c => c.id === cardId);
+  if (!card) {
+    alert('Cartão não encontrado.');
+    return;
+  }
+  
+  modal('Editar cartão corporativo', `<form class="form" onsubmit="submitEditCard(event, ${cardId})"><div class="card-grid"><label>Empresa<select id="cardCompany" required>${state.companies.map(c => `<option value="${c.name}" ${c.name === card.company ? 'selected' : ''}>${c.name}</option>`).join('')}</select></label><label>Nome do titular<input id="cardHolderName" value="${card.holderName.replace(/"/g, '&quot;')}" required></label><label>Bandeira<input id="cardBrand" value="${card.brand.replace(/"/g, '&quot;')}" required placeholder="Visa, Master, Elo..."></label><label>Final do cartão<input id="cardLast4" maxlength="4" value="${card.last4}" required></label><label>Validade (MM/AA)<input id="cardExpiry" placeholder="MM/AA" value="${card.expiry}" required></label><label>Limite<div class="money-input"><input type="text" id="cardLimitDisplay" class="money-field" data-target="cardLimit" inputmode="numeric" required placeholder="0,00" value="${(card.limit || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}"></div><input type="hidden" id="cardLimit" value="${(card.limit || 0).toFixed(2)}"></label><label>Status<select id="cardActive" required><option value="true" ${card.active ? 'selected' : ''}>Ativo</option><option value="false" ${!card.active ? 'selected' : ''}>Inativo</option></select></label></div><button class="btn btn-primary btn-lg" type="submit">Salvar alterações</button></form>`);
+  
+  setupMoneyFormatting();
+  
+  const expiryInput = qs('#cardExpiry');
+  if (expiryInput) {
+    expiryInput.addEventListener('input', function(e) {
+      let value = this.value.replace(/\D/g, '');
+      if (value.length >= 2) value = value.slice(0, 2) + '/' + value.slice(2, 4);
+      this.value = value;
+    });
+    expiryInput.addEventListener('blur', function() {
+      let value = this.value;
+      const regex = /^(\d{2})\/(\d{2})$/;
+      const match = value.match(regex);
+      if (match) {
+        let month = match[1];
+        let year = match[2];
+        const monthNum = parseInt(month, 10);
+        if (monthNum >= 1 && monthNum <= 12) {
+          this.value = `${month}/${year}`;
+        } else {
+          this.value = value;
+          alert('Mês inválido. Digite um mês entre 01 e 12.');
+        }
+      } else if (value.length > 0) {
+        alert('Formato inválido. Use MM/AA (ex: 10/30)');
+      }
+    });
+  }
+}
+window.editCard = editCard;
+
+function submitEditCard(ev, cardId) {
+  ev.preventDefault();
+  
+  const card = state.cards.find(c => c.id === cardId);
+  if (!card) {
+    alert('Cartão não encontrado.');
+    return;
+  }
+  
+  let expiryValue = qs('#cardExpiry').value;
+  const regex = /^(\d{2})\/(\d{2})$/;
+  const match = expiryValue.match(regex);
+  if (!match) {
+    alert('Formato de validade inválido. Use MM/AA (ex: 10/30)');
+    return;
+  }
+  
+  let month = match[1];
+  let year = match[2];
+  const monthNum = parseInt(month, 10);
+  if (monthNum < 1 || monthNum > 12) {
+    alert('Mês inválido. Digite um mês entre 01 e 12.');
+    return;
+  }
+  
+  expiryValue = `${month}/${year}`;
+  
+  // Verifica se o cartão está em uso antes de permitir edição de campos críticos
+  const isInUse = state.trips.some(t => t.cardId === cardId && t.cardInUse === true && !['finalizada', 'recusada'].includes(t.status));
+  
+  if (isInUse) {
+    alert('⚠️ Este cartão está em uso em uma viagem ativa. Você só pode editar o status ou o limite. Entre em contato com o usuário antes de desativar o cartão.');
+    // Permite apenas editar status e limite se estiver em uso
+    const newActive = qs('#cardActive').value === 'true';
+    const newLimit = Number(qs('#cardLimit').value || 0);
+    card.active = newActive;
+    card.limit = newLimit;
+  } else {
+    // Edição completa permitida
+    card.company = qs('#cardCompany').value;
+    card.holderName = qs('#cardHolderName').value;
+    card.brand = qs('#cardBrand').value;
+    card.last4 = qs('#cardLast4').value;
+    card.expiry = expiryValue;
+    card.limit = Number(qs('#cardLimit').value || 0);
+    card.active = qs('#cardActive').value === 'true';
+  }
+  
+  saveData();
+  closeModal();
+  renderApp();
+  alert('Cartão atualizado com sucesso!');
+}
+window.submitEditCard = submitEditCard;
+
+function deleteCard(cardId) {
+  const card = state.cards.find(c => c.id === cardId);
+  if (!card) {
+    alert('Cartão não encontrado.');
+    return;
+  }
+  
+  // Verifica se o cartão está em uso
+  const isInUse = state.trips.some(t => t.cardId === cardId && t.cardInUse === true && !['finalizada', 'recusada'].includes(t.status));
+  
+  if (isInUse) {
+    alert(`❌ Não é possível excluir o cartão "${card.brand} • Final ${card.last4}" porque ele está em uso em uma viagem ativa.`);
+    return;
+  }
+  
+  if (confirm(`Deseja excluir o cartão "${card.brand} • Final ${card.last4}" da empresa ${card.company}? Esta ação não pode ser desfeita.`)) {
+    const index = state.cards.findIndex(c => c.id === cardId);
+    if (index !== -1) {
+      state.cards.splice(index, 1);
+      saveData();
+      renderApp();
+      alert('Cartão excluído com sucesso!');
+    }
+  }
+}
+window.deleteCard = deleteCard;
+
 function submitCard(ev) {
   ev.preventDefault();
   
@@ -718,6 +921,23 @@ function submitCard(ev) {
 window.submitCard = submitCard;
 
 function openTripModal() {
+  const user = currentUser();
+  
+  // Verifica se existe viagem com cancelamento pendente
+  const hasPendingCancellation = state.trips.some(t => t.userId === user.id && t.status === 'cancelamento_solicitado');
+  
+  if (hasPendingCancellation) {
+    alert('❌ Você possui um pedido de cancelamento aguardando aprovação do financeiro. Aguarde a análise antes de abrir uma nova viagem.');
+    return;
+  }
+  
+  // Verifica se já tem viagem em andamento
+  const hasActiveTrip = activeTripForUser(user.id);
+  if (hasActiveTrip) {
+    alert('❌ Você já possui uma viagem em andamento. Finalize ou cancele a viagem atual antes de abrir uma nova.');
+    return;
+  }
+  
   modal('Nova viagem', `<form class="form" onsubmit="submitTrip(event)"><div class="card-grid"><label>Empresa<select id="tripCompany" required>${state.companies.map(c => `<option value="${c.name}">${c.name}</option>`).join('')}</select></label><label>Cidade do serviço<input id="tripCity" required placeholder="Ex: São Paulo, Porto Alegre..."></label><label>Cliente<input id="tripServiceLocation" required placeholder="Nome do cliente"></label><label>Data inicial<input id="tripStartDate" type="date" required></label><label>Data final<input id="tripEndDate" type="date" required></label><label>Valor previsto<div class="money-input"><input type="text" id="tripPlannedDisplay" class="money-field" data-target="tripPlannedAmount" inputmode="numeric" required placeholder="0,00"></div><input type="hidden" id="tripPlannedAmount"></label></div><button class="btn btn-primary btn-lg" type="submit">Enviar solicitação para o financeiro</button></form>`);
   setupMoneyFormatting();
   const start = qs('#tripStartDate');
@@ -730,6 +950,127 @@ function openTripModal() {
   });
 }
 window.openTripModal = openTripModal;
+
+function requestTripCancellation(tripId) {
+  const trip = state.trips.find(t => t.id === tripId);
+  if (!trip) {
+    alert('Viagem não encontrada.');
+    return;
+  }
+  
+  // Verifica se a viagem está em um status que permite cancelamento
+  if (!['aprovada', 'em_andamento'].includes(trip.status)) {
+    alert('Apenas viagens aprovadas ou em andamento podem ser canceladas.');
+    return;
+  }
+  
+  // Verifica se já não há um pedido de cancelamento pendente
+  if (trip.status === 'cancelamento_solicitado') {
+    alert('Já existe um pedido de cancelamento aguardando aprovação do financeiro.');
+    return;
+  }
+  
+  modal('Solicitar cancelamento de viagem', `
+    <form class="form" onsubmit="submitCancellationRequest(event, ${tripId})">
+      <label>
+        Motivo do cancelamento
+        <textarea id="cancellationReason" required placeholder="Explique o motivo pelo qual deseja cancelar esta viagem..."></textarea>
+      </label>
+      <div class="legal-notice" style="background: #fff8e6;">
+        <strong>⚠️ Atenção</strong>
+        <p>Ao solicitar o cancelamento, você concorda em devolver todos os valores e recursos disponibilizados. O financeiro irá analisar seu pedido.</p>
+      </div>
+      <button class="btn btn-warning btn-lg" type="submit">Solicitar cancelamento</button>
+    </form>
+  `);
+}
+window.requestTripCancellation = requestTripCancellation;
+
+function submitCancellationRequest(ev, tripId) {
+  ev.preventDefault();
+  
+  const trip = state.trips.find(t => t.id === tripId);
+  if (!trip) return;
+  
+  const cancellationReason = qs('#cancellationReason').value;
+  if (!cancellationReason.trim()) {
+    alert('Por favor, informe o motivo do cancelamento.');
+    return;
+  }
+  
+  trip.cancellationReason = cancellationReason;
+  trip.cancellationRequestedAt = todayISO();
+  trip.status = 'cancelamento_solicitado';
+  
+  saveData();
+  closeModal();
+  renderApp();
+  alert('✅ Pedido de cancelamento enviado ao financeiro para aprovação.');
+}
+window.submitCancellationRequest = submitCancellationRequest;
+
+function approveCancellation(tripId) {
+  const trip = state.trips.find(t => t.id === tripId);
+  if (!trip) return;
+  
+  if (confirm(`Deseja APROVAR o cancelamento da viagem de ${trip.serviceLocation}?\n\nMotivo: ${trip.cancellationReason}\n\nO cartão será liberado e o usuário poderá abrir uma nova viagem.`)) {
+    // Libera o cartão se estiver em uso
+    if (trip.cardInUse) {
+      trip.cardInUse = false;
+    }
+    trip.status = 'cancelada';
+    trip.cancellationApprovedAt = todayISO();
+    trip.cancellationApprovedBy = currentUser()?.name || 'Financeiro';
+    
+    saveData();
+    renderApp();
+    alert('✅ Cancelamento aprovado! O usuário agora pode abrir uma nova viagem.');
+  }
+}
+window.approveCancellation = approveCancellation;
+
+function rejectCancellation(tripId) {
+  const trip = state.trips.find(t => t.id === tripId);
+  if (!trip) return;
+  
+  modal('Recusar pedido de cancelamento', `
+    <form class="form" onsubmit="submitRejectCancellation(event, ${tripId})">
+      <div class="legal-notice" style="background: #fff0f2; border-left-color: var(--danger); margin-bottom: 16px;">
+        <strong>Motivo do cancelamento solicitado pelo usuário:</strong>
+        <p style="margin-top: 8px; white-space: pre-wrap;">${trip.cancellationReason || 'Não informado'}</p>
+      </div>
+      <label>
+        Motivo da recusa do cancelamento
+        <textarea id="rejectionReason" required placeholder="Explique o motivo pelo qual o cancelamento está sendo recusado..."></textarea>
+      </label>
+      <button class="btn btn-danger btn-lg" type="submit">Recusar cancelamento</button>
+    </form>
+  `);
+}
+window.rejectCancellation = rejectCancellation;
+
+function submitRejectCancellation(ev, tripId) {
+  ev.preventDefault();
+  
+  const trip = state.trips.find(t => t.id === tripId);
+  if (!trip) return;
+  
+  const rejectionReason = qs('#rejectionReason').value;
+  if (!rejectionReason.trim()) {
+    alert('Por favor, informe o motivo da recusa.');
+    return;
+  }
+  
+  trip.cancellationRejectionReason = rejectionReason;
+  trip.status = trip.cardInUse ? 'em_andamento' : 'aprovada'; // Volta ao status anterior
+  trip.cancellationRejectedAt = todayISO();
+  
+  saveData();
+  closeModal();
+  renderApp();
+  alert('❌ Cancelamento recusado. A viagem continua ativa.');
+}
+window.submitRejectCancellation = submitRejectCancellation;
 
 function submitTrip(ev) {
   ev.preventDefault();
