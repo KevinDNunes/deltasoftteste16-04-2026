@@ -510,7 +510,7 @@ function techTripCard(t, expanded = false) {
   const isRejected = t.status === 'recusada';
   const isPendingCancellation = t.status === 'cancelamento_solicitado';
   const isCancelled = t.status === 'cancelada';
-  const canRequestCancellation = ['aprovada', 'em_andamento'].includes(t.status);
+  const canRequestCancellation = ['aprovada', 'em_andamento'].includes(t.status) && (!t.expenses || t.expenses.length === 0);
   
   let statusBadge = badge(t.status);
   let statusIcon = '';
